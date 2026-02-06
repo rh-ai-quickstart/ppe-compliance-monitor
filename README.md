@@ -15,7 +15,7 @@ and include that in the reported safety summary.
 
 - Backend (Flask, OpenCV, Ultralytics): video processing, detection, summaries.
 - Frontend (React): UI for live feed, summaries, and chat.
-- Container build: single image that contains both backend and frontend builds.
+- Container build: separate backend and frontend images.
 
 ## Prerequisites
 
@@ -38,29 +38,67 @@ Frontend runtime config (`app/frontend/public/env.js` or mounted in containers):
 Build and run:
 
 ```
-podman-compose -f deploy/local/podman-compose.yaml up --build
+make local-build-up
+```
+
+Run without forcing a rebuild (builds only if missing):
+
+```
+make local-up
+```
+
+Stop:
+
+```
+make local-down
 ```
 
 Access:
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:8888`
 
-## Helm
+## Local (No Containers)
 
-Install the chart (set your image repo/tag):
-
-```
-helm install demo deploy/helm/ppe-compliance-monitor \
-  --set image.repository=<your-repo> \
-  --set image.tag=<your-tag>
-```
-
-Override API URLs or CORS:
+Backend:
 
 ```
-helm upgrade demo deploy/helm/ppe-compliance-monitor \
-  --set frontend.apiUrl=http://demo-backend:8888 \
-  --set backend.corsOrigins=http://demo-frontend:3000
+make dev-backend
+```
+
+Frontend:
+
+```
+make dev-frontend
+```
+
+## OpenShift
+
+Build and push images:
+
+```
+make build
+make push
+```
+
+Deploy and undeploy:
+
+```
+make deploy
+make undeploy
+```
+
+You can override the namespace or image tag:
+
+```
+make deploy NAMESPACE=<your-namespace> IMAGE_TAG=<tag>
+```
+
+Override API URLs or CORS (Helm values):
+
+```
+helm upgrade ppe-compliance-monitor deploy/helm/ppe-compliance-monitor \
+  --set frontend.apiUrl=/api \
+  --set backend.corsOrigins=http://your-frontend-host
 ```
 
 OpenShift-specific options are included in the chart:

@@ -23,8 +23,10 @@ IMAGE_NAME ?= ppe-compliance-monitor
 IMAGE_TAG ?= latest
 IMAGE_REGISTRY ?= quay.io/rh-ai-quickstart
 IMAGE_REPOSITORY := $(if $(IMAGE_REGISTRY),$(IMAGE_REGISTRY)/,)$(IMAGE_NAME)
-IMAGE := $(IMAGE_REPOSITORY):$(IMAGE_TAG)
-LOCAL_IMAGE ?= ppe-compliance-monitor:local
+BACKEND_IMAGE := $(IMAGE_REPOSITORY)-backend:$(IMAGE_TAG)
+FRONTEND_IMAGE := $(IMAGE_REPOSITORY)-frontend:$(IMAGE_TAG)
+LOCAL_BACKEND_IMAGE ?= ppe-compliance-monitor-backend:local
+LOCAL_FRONTEND_IMAGE ?= ppe-compliance-monitor-frontend:local
 PYTHON ?= python3
 VENV_DIR ?= .venv
 BACKEND_DIR ?= app/backend
@@ -40,7 +42,8 @@ local-build-up: ensure-assets
 
 local-build:
 	@should_build=0; \
-	if ! podman image exists $(LOCAL_IMAGE); then should_build=1; fi; \
+	if ! podman image exists $(LOCAL_BACKEND_IMAGE); then should_build=1; fi; \
+	if ! podman image exists $(LOCAL_FRONTEND_IMAGE); then should_build=1; fi; \
 	if [ $$should_build -eq 1 ]; then \
 		echo "Building local image..."; \
 		PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) build; \
@@ -52,13 +55,15 @@ local-down:
 	podman-compose -f $(COMPOSE_FILE) down
 
 build: ensure-assets
-	podman build --platform $(PLATFORM_RELEASE) -t $(IMAGE) -f Dockerfile .
+	podman build --platform $(PLATFORM_RELEASE) -t $(BACKEND_IMAGE) -f app/backend/Dockerfile app
+	podman build --platform $(PLATFORM_RELEASE) -t $(FRONTEND_IMAGE) -f app/frontend/Dockerfile app/frontend
 
 push:
-	@if podman image exists $(IMAGE); then \
-		podman push $(IMAGE); \
+	@if podman image exists $(BACKEND_IMAGE) && podman image exists $(FRONTEND_IMAGE); then \
+		podman push $(BACKEND_IMAGE); \
+		podman push $(FRONTEND_IMAGE); \
 	else \
-		echo "Image $(IMAGE) not found. Run 'make build' first."; \
+		echo "Images not found. Run 'make build' first."; \
 		exit 1; \
 	fi
 
@@ -72,8 +77,10 @@ deploy:
 	fi; \
 	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) \
 		--namespace $(NAMESPACE) --create-namespace \
-		--set image.repository=$(IMAGE_REPOSITORY) \
-		--set image.tag=$(IMAGE_TAG) \
+		--set backend.image.repository=$(IMAGE_REPOSITORY)-backend \
+		--set backend.image.tag=$(IMAGE_TAG) \
+		--set frontend.image.repository=$(IMAGE_REPOSITORY)-frontend \
+		--set frontend.image.tag=$(IMAGE_TAG) \
 		$${host:+--set openshift.sharedHost=$$host}
 
 undeploy:
