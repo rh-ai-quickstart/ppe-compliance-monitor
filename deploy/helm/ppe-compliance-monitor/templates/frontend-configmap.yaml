@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ppe-compliance-monitor.fullname" . }}-frontend-env
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+data:
+  env.js: |
+    window.__ENV__ = { API_URL: {{ .Values.frontend.apiUrl | default "/api" | quote }} };

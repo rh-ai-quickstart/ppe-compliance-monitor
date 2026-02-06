@@ -1,0 +1,23 @@
+{{- if .Values.openshift.backendRoute.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ printf "%s-be" .Release.Name | trunc 30 | trimSuffix "-" }}
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  {{- if .Values.openshift.sharedHost }}
+  host: {{ .Values.openshift.sharedHost | quote }}
+  {{- else if .Values.openshift.backendRoute.host }}
+  host: {{ .Values.openshift.backendRoute.host | quote }}
+  {{- else if .Values.openshift.route.host }}
+  host: {{ .Values.openshift.route.host | quote }}
+  {{- end }}
+  path: /api
+  to:
+    kind: Service
+    name: {{ include "ppe-compliance-monitor.fullname" . }}-backend
+  port:
+    targetPort: http
+{{- end }}

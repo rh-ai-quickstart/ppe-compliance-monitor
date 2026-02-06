@@ -1,0 +1,23 @@
+.logo-bar {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    z-index: 1000;
+}
+
+.logo {
+    height: 50px;
+    width: auto;
+    object-fit: contain;
+}
+
+.redhat-logo {
+    height: 50px; /* Adjust if needed */
+}
+
+.intel-logo {
+    height: 50px; /* Adjust if needed */
+}

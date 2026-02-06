@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: ppe-compliance-monitor:local
+    command: ["python", "/app/backend/app.py"]
+    environment:
+      CORS_ORIGINS: "http://localhost:3000"
+    ports:
+      - "8888:8888"
+
+  frontend:
+    image: ppe-compliance-monitor:local
+    depends_on:
+      - backend
+    environment:
+      FRONTEND_API_URL: "http://localhost:8888/api"
+    command:
+      - sh
+      - -c
+      - >
+        printf "window.__ENV__ = { API_URL: \"%s\" };\n" "$${FRONTEND_API_URL}" > /app/frontend/build/env.js
+        && serve -s /app/frontend/build -l tcp://0.0.0.0:3000
+    ports:
+      - "3000:3000"

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ppe-compliance-monitor.fullname" . }}-frontend
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "ppe-compliance-monitor.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        {{- include "ppe-compliance-monitor.labels" . | nindent 8 }}
+        app.kubernetes.io/component: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["serve", "-s", "/app/frontend/build", "-l", "tcp://0.0.0.0:3000"]
+          ports:
+            - containerPort: {{ .Values.frontend.port }}
+              name: http
+          volumeMounts:
+            - name: frontend-env
+              mountPath: /app/frontend/build/env.js
+              subPath: env.js
+      volumes:
+        - name: frontend-env
+          configMap:
+            name: {{ include "ppe-compliance-monitor.fullname" . }}-frontend-env
+            items:
+              - key: env.js
+                path: env.js

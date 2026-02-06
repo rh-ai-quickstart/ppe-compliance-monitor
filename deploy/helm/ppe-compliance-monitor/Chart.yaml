@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ppe-compliance-monitor
+description: Deploy the PPE compliance monitor backend and frontend
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

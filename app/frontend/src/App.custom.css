@@ -1,0 +1,134 @@
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.App {
+  background-color: #000000;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.main-title {
+  background: linear-gradient(45deg, #0071c5, #ed1c24);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 1.0vw;
+  font-weight: bold;
+  text-align: center;
+  padding: 10px 0;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  margin: 0;
+}
+
+.company-names {
+  display: block;
+  font-size: 1.0vw;
+  margin-top: 0px;
+}
+
+.company-names .intel {
+  color: #003cff;
+}
+
+.company-names .redhat {
+  color: #EE0000;
+}
+
+.content-wrapper {
+  background-color: #111111;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  margin-top: 20px;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.diagram-toggle {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 10px 15px;
+  background-color: #333;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  z-index: 1000;
+  font-size: 0.8vw;
+}
+
+.diagram-toggle:hover {
+  background-color: #555;
+}
+
+.diagram-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.diagram-overlay img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
+/* Adjustments for Safety Trends */
+.safety-trends {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+}
+
+.safety-trend-card {
+  flex: 1 1 calc(33% - 20px);
+  min-width: 250px;
+  background-color: #FF0000; /* Bright red */
+  /* or */
+  /* background-color: #8B0000; /* Dark red */
+  margin-bottom: 15px;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+}
+
+.safety-trend-card h3 {
+  margin-top: 0;
+  color: #ffffff;
+  font-size: 1.2em;
+  margin-bottom: 10px;
+}
+
+/* Ensure content inside safety trend cards doesn't overflow */
+.safety-trend-card > div {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.safety-trend-card-content {
+  color: #e0e0e0;
+  font-size: 1em;
+  line-height: 1.4;
+}
+
+/* Add this new style at the end of your CSS file */
+.content-wrapper .safety-trends .safety-trend-card {
+  background-color: #FF0000 !important; /* Bright red */
+}

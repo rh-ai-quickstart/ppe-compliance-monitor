@@ -1,0 +1,59 @@
+import React, { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
+import './ChatBot.css';
+import { API_URL } from '../config';
+
+
+const ChatBot = () => {
+  const [question, setQuestion] = useState('');
+  const [chatHistory, setChatHistory] = useState([]);
+  const chatHistoryRef = useRef(null);
+
+  useEffect(() => {
+    if (chatHistoryRef.current) {
+      chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!question.trim()) return;
+
+    const newChatHistory = [...chatHistory, { sender: 'user', message: question }];
+    setChatHistory(newChatHistory);
+    setQuestion('');
+
+    try {
+      const response = await axios.post(`${API_URL}/chat`, { question });
+      const answer = response.data.answer;
+      setChatHistory([...newChatHistory, { sender: 'bot', message: answer }]);
+    } catch (error) {
+      console.error('Error asking question:', error);
+      setChatHistory([...newChatHistory, { sender: 'bot', message: "I'm sorry, but I encountered an error while processing your request." }]);
+    }
+  };
+
+  return (
+    <div className="chatbot">
+      <div className="chatbot-title">Chat Assistant</div>
+      <div className="chat-history" ref={chatHistoryRef}>
+        {chatHistory.map((chat, index) => (
+          <div key={index} className={`chat-message ${chat.sender}`}>
+            <p>{chat.message}</p>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={handleSubmit} className="chat-form">
+        <input
+          type="text"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Ask a question..."
+        />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  );
+};
+
+export default ChatBot;

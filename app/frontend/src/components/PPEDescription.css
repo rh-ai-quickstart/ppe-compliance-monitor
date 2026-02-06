@@ -1,0 +1,108 @@
+.ppe-description {
+    background-color: #000000;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+    color: #ffffff;
+    max-height: calc(100vh - 100px); /* Adjust based on your layout */
+    display: flex;
+    flex-direction: column;
+}
+
+.description-section,
+.summary-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.description-section {
+    background-color: #0066cc; /* Blue background for Latest PPE Detection */
+}
+
+.summary-section {
+    background-color: #ff0000; /* Yellow background for Safety Trends */
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+h3 {
+    font-size: 1.2em;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #ffffff;
+}
+
+.description-section h3 {
+    color: #ffffff;
+}
+
+.summary-section h3 {
+    color: #000000;
+}
+
+.detection-info {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-left: 4px solid #ffffff;
+    padding: 10px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #ffffff;
+    max-height: 100px; /* Adjust as needed */
+    overflow-y: auto;
+}
+
+.summary-feed {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 10px; /* Add some padding for the scrollbar */
+}
+
+.safety-trends {
+    background-color: rgba(0, 0, 0, 0.1);
+    border: 1px solid #000000;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.safety-trends pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: monospace;
+    font-size: 0.9em;
+    color: #000000;
+}
+
+.current-summary {
+    border-color: #000000;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Scrollbar styling */
+.summary-feed::-webkit-scrollbar,
+.detection-info::-webkit-scrollbar {
+    width: 8px;
+}
+
+.summary-feed::-webkit-scrollbar-track,
+.detection-info::-webkit-scrollbar-track {
+    background: #ffd700;
+}
+
+.summary-feed::-webkit-scrollbar-thumb,
+.detection-info::-webkit-scrollbar-thumb {
+    background: #000000;
+    border-radius: 4px;
+}
+
+.summary-feed::-webkit-scrollbar-thumb:hover,
+.detection-info::-webkit-scrollbar-thumb:hover {
+    background: #333333;
+}

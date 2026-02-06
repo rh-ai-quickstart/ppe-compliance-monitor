@@ -1,0 +1,27 @@
+.collapsible {
+  width: 100%;
+  margin: 20px 0;
+}
+
+.collapsible-header {
+  width: 100%;
+  padding: 10px;
+  background-color: #333;
+  color: #fff;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 1.2em;
+}
+
+.collapsible-content {
+  padding: 10px;
+  background-color: #444;
+  color: #fff;
+}
+
+.diagram {
+  width: 100%;
+  max-width: 1200px; /* Increase the max-width to make the diagram larger */
+  margin-top: 20px;
+}
