@@ -3,17 +3,33 @@ version: "3.8"
 services:
   backend:
     build:
-      context: ../..
-      dockerfile: Dockerfile
-    image: ppe-compliance-monitor:local
+      context: ../../app
+      dockerfile: backend/Dockerfile
+    image: ppe-compliance-monitor-backend:local
     command: ["python", "/app/backend/app.py"]
     environment:
       CORS_ORIGINS: "http://localhost:3000"
     ports:
       - "8888:8888"
+  # minio:
+  #   image: minio/minio:latest
+  #   ports:
+  #     - "9000:9000"
+  #   environment:
+  #     MINIO_ACCESS_KEY: minioadmin
+  #     MINIO_SECRET_KEY: minioadmin
+  #   command: ["minio", "server", "/data"]
+  #   volumes:
+  #     - minio_data:/data
+  # load:
+  #   image: minio-client:latest
+  #   command: ["sleep", "infinity"]
 
   frontend:
-    image: ppe-compliance-monitor:local
+    build:
+      context: ../../app/frontend
+      dockerfile: Dockerfile
+    image: ppe-compliance-monitor-frontend:local
     depends_on:
       - backend
     environment:
@@ -22,7 +38,7 @@ services:
       - sh
       - -c
       - >
-        printf "window.__ENV__ = { API_URL: \"%s\" };\n" "$${FRONTEND_API_URL}" > /app/frontend/build/env.js
-        && serve -s /app/frontend/build -l tcp://0.0.0.0:3000
+        printf "window.__ENV__ = { API_URL: \"%s\" };\n" "$${FRONTEND_API_URL}" > /app/build/env.js
+        && serve -s /app/build -l tcp://0.0.0.0:3000
     ports:
       - "3000:3000"

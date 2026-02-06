@@ -20,8 +20,8 @@ spec:
     spec:
       containers:
         - name: backend
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           command: ["python", "/app/backend/app.py"]
           ports:
             - containerPort: {{ .Values.backend.port }}

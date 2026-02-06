@@ -20,15 +20,15 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["serve", "-s", "/app/frontend/build", "-l", "tcp://0.0.0.0:3000"]
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          command: ["serve", "-s", "/app/build", "-l", "tcp://0.0.0.0:3000"]
           ports:
             - containerPort: {{ .Values.frontend.port }}
               name: http
           volumeMounts:
             - name: frontend-env
-              mountPath: /app/frontend/build/env.js
+              mountPath: /app/build/env.js
               subPath: env.js
       volumes:
         - name: frontend-env
