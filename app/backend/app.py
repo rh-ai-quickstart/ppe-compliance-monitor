@@ -16,13 +16,17 @@ cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000")
 if cors_origins.strip() == "*":
     cors_allowed_origins = "*"
 else:
-    cors_allowed_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+    cors_allowed_origins = [
+        origin.strip() for origin in cors_origins.split(",") if origin.strip()
+    ]
 
 CORS(app, resources={r"/*": {"origins": cors_allowed_origins}})
 
 
 default_video_path = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "data", "combined-video-no-gap-rooftop.mp4")
+    os.path.join(
+        os.path.dirname(__file__), "..", "data", "combined-video-no-gap-rooftop.mp4"
+    )
 )
 video_path = os.getenv("VIDEO_PATH", default_video_path)
 demo = MultiModalAIDemo(video_path)
@@ -31,7 +35,10 @@ demo.setup_components()
 latest_description = "Initializing..."
 latest_summary = "Processing video..."
 
-qa_pipeline = pipeline("question-answering", model="distilbert-base-uncased-distilled-squad")
+qa_pipeline = pipeline(
+    "question-answering", model="distilbert-base-uncased-distilled-squad"
+)
+
 
 def generate_frames():
     """Stream processed video frames with annotated detections."""
@@ -48,11 +55,11 @@ def generate_frames():
             currentClass = detection["class_name"]
 
             if conf > 0.5:
-                if currentClass == 'Person':
+                if currentClass == "Person":
                     color = (0, 255, 255)  # Cyan for person
-                elif currentClass in ['NO-Hardhat', 'NO-Safety Vest', 'NO-Mask']:
+                elif currentClass in ["NO-Hardhat", "NO-Safety Vest", "NO-Mask"]:
                     color = (0, 0, 255)  # Red for non-compliance
-                elif currentClass in ['Hardhat', 'Safety Vest', 'Mask']:
+                elif currentClass in ["Hardhat", "Safety Vest", "Mask"]:
                     color = (0, 255, 0)  # Green for compliance
                 else:
                     color = (255, 255, 0)  # Yellow for other objects
@@ -74,7 +81,7 @@ def generate_frames():
                 annotated_frame = cv2.addWeighted(annotated_frame, 1, glow, 0.5, 0)
 
                 # Add text with futuristic style
-                label = f'{currentClass} {conf:.2f}'
+                label = f"{currentClass} {conf:.2f}"
                 text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)[0]
                 cv2.rectangle(
                     annotated_frame,
@@ -97,23 +104,26 @@ def generate_frames():
             latest_description = demo.description_buffer[-1]
         latest_summary = demo.latest_summary or latest_summary
 
-        ret, buffer = cv2.imencode('.jpg', annotated_frame)
+        ret, buffer = cv2.imencode(".jpg", annotated_frame)
         frame = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
 
-@api.route('/video_feed')
+
+@api.route("/video_feed")
 def video_feed():
     """Video streaming route."""
-    return Response(generate_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame"
+    )
 
-@api.route('/')
+
+@api.route("/")
 def api_root():
     """Simple health response for the API root."""
-    return jsonify({'status': 'ok'})
+    return jsonify({"status": "ok"})
 
-@api.route('/latest_info')
+
+@api.route("/latest_info")
 def latest_info():
     """Return the latest description and summary."""
     global latest_description, latest_summary
@@ -121,33 +131,32 @@ def latest_info():
     if demo.description_buffer:
         latest_description = demo.description_buffer[-1]
     latest_summary = demo.latest_summary or latest_summary
-    return jsonify({
-        'description': latest_description,
-        'summary': latest_summary
-    })
+    return jsonify({"description": latest_description, "summary": latest_summary})
 
-@api.route('/ask_question', methods=['POST'])
+
+@api.route("/ask_question", methods=["POST"])
 def ask_question():
     """Answer a question based on latest description and summary."""
     data = request.get_json(silent=True) or {}
-    question = (data.get('question') or '').strip()
+    question = (data.get("question") or "").strip()
     if not question:
-        return jsonify({'error': "Field 'question' is required."}), 400
+        return jsonify({"error": "Field 'question' is required."}), 400
 
     context = latest_description + " " + latest_summary
     result = qa_pipeline(question=question, context=context)
-    answer = result['answer']
-    return jsonify({'answer': answer})
+    answer = result["answer"]
+    return jsonify({"answer": answer})
 
-@api.route('/chat', methods=['POST'])
+
+@api.route("/chat", methods=["POST"])
 def chat():
     """Handle chat requests using latest detections and summary."""
     try:
         global latest_description, latest_summary
         data = request.get_json(silent=True) or {}
-        user_message = (data.get('question') or '').strip()
+        user_message = (data.get("question") or "").strip()
         if not user_message:
-            return jsonify({'error': "Field 'question' is required."}), 400
+            return jsonify({"error": "Field 'question' is required."}), 400
 
         demo.capture_and_update()
         if demo.description_buffer:
@@ -157,16 +166,21 @@ def chat():
         current_summary = demo.get_latest_summary() or latest_summary
 
         response = generate_response(user_message, latest_detection, current_summary)
-        return jsonify({'answer': response})
+        return jsonify({"answer": response})
     except Exception as e:
         print(f"Error in chat route: {str(e)}")
         print(f"Error type: {type(e).__name__}")
         print(f"Error traceback: {traceback.format_exc()}")
-        return jsonify({'answer': f"I'm sorry, but I encountered an error while processing your request: {str(e)}"})
+        return jsonify(
+            {
+                "answer": f"I'm sorry, but I encountered an error while processing your request: {str(e)}"
+            }
+        )
+
 
 app.register_blueprint(api)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     port = int(os.getenv("PORT", "8888"))
     debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    app.run(host="0.0.0.0", port=port, debug=debug)

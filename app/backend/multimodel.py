@@ -5,8 +5,10 @@ from ultralytics import YOLO
 from collections import defaultdict
 import os
 
+
 class MultiModalAIDemo:
     """Core video analysis pipeline for detection, summaries, and chat context."""
+
     def __init__(self, video_path):
         """Initialize the demo with a local video path."""
         self.video_path = video_path
@@ -15,9 +17,19 @@ class MultiModalAIDemo:
         self.summarizer = None
         self.description_buffer = []
         self.frame_count = 0
-        self.class_names = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
-                            'Safety Vest', 'machinery', 'vehicle']
-        self.ppe_stats = defaultdict(lambda: {'compliant': 0, 'non_compliant': 0})
+        self.class_names = [
+            "Hardhat",
+            "Mask",
+            "NO-Hardhat",
+            "NO-Mask",
+            "NO-Safety Vest",
+            "Person",
+            "Safety Cone",
+            "Safety Vest",
+            "machinery",
+            "vehicle",
+        ]
+        self.ppe_stats = defaultdict(lambda: {"compliant": 0, "non_compliant": 0})
         self.latest_detection = defaultdict(int)
         self.latest_summary = ""
 
@@ -32,22 +44,30 @@ class MultiModalAIDemo:
         print("Model classes:", self.anomaly_detector.names)
         self.class_names = list(self.anomaly_detector.names.values())
         print("Using class names:", self.class_names)
-        
+
         model_name = "google/flan-t5-base"
         self.summarizer_tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.summarizer_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-        
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.summarizer_model.to(self.device)
 
     def format_detection_description(self, detections):
         """Build a short, human-readable description from detection counts."""
         description = "Detected: "
-        for item in ['Person', 'Hardhat', 'Safety Vest', 'Mask', 'NO-Hardhat', 'NO-Safety Vest', 'NO-Mask']:
+        for item in [
+            "Person",
+            "Hardhat",
+            "Safety Vest",
+            "Mask",
+            "NO-Hardhat",
+            "NO-Safety Vest",
+            "NO-Mask",
+        ]:
             if detections[item] > 0:
                 description += f"{item}: {detections[item]}, "
 
-        return description.rstrip(', ')
+        return description.rstrip(", ")
 
     def append_description(self, description):
         """Append a description to the rolling buffer with bounds."""
@@ -77,24 +97,48 @@ class MultiModalAIDemo:
         frame_count = len(descriptions)
 
         for desc in descriptions:
-            for item in ['Person', 'Hardhat', 'Safety Vest', 'Mask', 'NO-Hardhat', 'NO-Safety Vest', 'NO-Mask']:
+            for item in [
+                "Person",
+                "Hardhat",
+                "Safety Vest",
+                "Mask",
+                "NO-Hardhat",
+                "NO-Safety Vest",
+                "NO-Mask",
+            ]:
                 count = desc.count(item)
                 total_stats[item] += count
 
         summary = "Safety Trends Summary:\n\n"
         summary += f"Total observations: {frame_count} frames\n\n"
 
-        if total_stats['Person'] > 0:
-            hardhat_compliance = total_stats['Hardhat'] / (total_stats['Hardhat'] + total_stats['NO-Hardhat']) if (total_stats['Hardhat'] + total_stats['NO-Hardhat']) > 0 else 0
-            vest_compliance = total_stats['Safety Vest'] / (total_stats['Safety Vest'] + total_stats['NO-Safety Vest']) if (total_stats['Safety Vest'] + total_stats['NO-Safety Vest']) > 0 else 0
-            mask_compliance = total_stats['Mask'] / (total_stats['Mask'] + total_stats['NO-Mask']) if (total_stats['Mask'] + total_stats['NO-Mask']) > 0 else 0
+        if total_stats["Person"] > 0:
+            hardhat_compliance = (
+                total_stats["Hardhat"]
+                / (total_stats["Hardhat"] + total_stats["NO-Hardhat"])
+                if (total_stats["Hardhat"] + total_stats["NO-Hardhat"]) > 0
+                else 0
+            )
+            vest_compliance = (
+                total_stats["Safety Vest"]
+                / (total_stats["Safety Vest"] + total_stats["NO-Safety Vest"])
+                if (total_stats["Safety Vest"] + total_stats["NO-Safety Vest"]) > 0
+                else 0
+            )
+            mask_compliance = (
+                total_stats["Mask"] / (total_stats["Mask"] + total_stats["NO-Mask"])
+                if (total_stats["Mask"] + total_stats["NO-Mask"]) > 0
+                else 0
+            )
 
             summary += "Compliance rates:\n"
             summary += f"\n• Hardhat compliance: {hardhat_compliance:.2%} ({total_stats['Hardhat']} out of {total_stats['Hardhat'] + total_stats['NO-Hardhat']} detections)"
             summary += f"\n• Safety Vest compliance: {vest_compliance:.2%} ({total_stats['Safety Vest']} out of {total_stats['Safety Vest'] + total_stats['NO-Safety Vest']} detections)"
             summary += f"\n• Mask compliance: {mask_compliance:.2%} ({total_stats['Mask']} out of {total_stats['Mask'] + total_stats['NO-Mask']} detections)"
 
-            overall_compliance = (hardhat_compliance + vest_compliance + mask_compliance) / 3
+            overall_compliance = (
+                hardhat_compliance + vest_compliance + mask_compliance
+            ) / 3
             summary += f"\n\nOverall PPE compliance: {overall_compliance:.2%}\n"
 
             summary += "\nRecommendations:\n"
@@ -107,7 +151,9 @@ class MultiModalAIDemo:
                 summary += "\n• Reinforce PPE policies through team meetings."
                 summary += "\n• Consider additional PPE training sessions."
             else:
-                summary += "\n• Good compliance observed. Maintain current safety protocols."
+                summary += (
+                    "\n• Good compliance observed. Maintain current safety protocols."
+                )
                 summary += "\n• Continue regular safety reminders and training."
         else:
             summary += "\n• No people detected in the observed period."
@@ -144,12 +190,14 @@ class MultiModalAIDemo:
                 cls = int(box.cls[0])
                 class_name = self.class_names[cls]
                 counts[class_name] += 1
-                detections.append({
-                    "bbox": (x1, y1, x2, y2),
-                    "confidence": conf,
-                    "class_id": cls,
-                    "class_name": class_name,
-                })
+                detections.append(
+                    {
+                        "bbox": (x1, y1, x2, y2),
+                        "confidence": conf,
+                        "class_id": cls,
+                        "class_name": class_name,
+                    }
+                )
 
         self.latest_detection = counts
         description = self.format_detection_description(counts)

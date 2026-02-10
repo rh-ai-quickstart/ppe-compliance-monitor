@@ -22,7 +22,7 @@ services:
     container_name: minio
     ports:
       - "9000:9000"
-      - "9001:9001"  # MinIO Console port
+      - "9001:9001" # MinIO Console port
     environment:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
@@ -54,10 +54,11 @@ services:
       - sh
       - -c
       - >
-        printf "window.__ENV__ = { API_URL: \"%s\" };\n" "$${FRONTEND_API_URL}" > /app/build/env.js
-        && serve -s /app/build -l tcp://0.0.0.0:3000
+        printf "window.__ENV__ = { API_URL: \"%s\" };\n" "$${FRONTEND_API_URL}" > /app/build/env.js && serve -s /app/build -l tcp://0.0.0.0:3000 #magic___^_^___line
     ports:
       - "3000:3000"
 
+
 volumes:
   minio_data:
+  model_repo:
