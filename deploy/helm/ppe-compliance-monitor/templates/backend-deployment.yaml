@@ -18,6 +18,23 @@ spec:
         {{- include "ppe-compliance-monitor.labels" . | nindent 8 }}
         app.kubernetes.io/component: backend
     spec:
+      volumes:
+        - name: shared-data
+          emptyDir: {}
+      initContainers:
+        - name: load-data
+          image: "{{ .Values.data.image.repository }}:{{ .Values.data.image.tag }}"
+          imagePullPolicy: {{ .Values.data.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /shared/data /shared/models
+              cp -r /data/* /shared/data/
+              cp -r /models/* /shared/models/
+          volumeMounts:
+            - name: shared-data
+              mountPath: /shared
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
@@ -26,6 +43,13 @@ spec:
           ports:
             - containerPort: {{ .Values.backend.port }}
               name: http
+          volumeMounts:
+            - name: shared-data
+              mountPath: /app/shared
           env:
             - name: CORS_ORIGINS
               value: {{ default (printf "http://%s-frontend:%d" (include "ppe-compliance-monitor.fullname" .) .Values.frontend.port) .Values.backend.corsOrigins | quote }}
+            - name: MODEL_PATH
+              value: /app/shared/models/ppe.pt
+            - name: VIDEO_PATH
+              value: /app/shared/data/combined-video-no-gap-rooftop.mp4
