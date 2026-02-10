@@ -1,5 +1,8 @@
 version: "3.8"
 
+networks:
+  ppe:
+
 services:
   backend:
     build:
@@ -8,22 +11,33 @@ services:
     image: ppe-compliance-monitor-backend:local
     command: ["python", "/app/backend/app.py"]
     environment:
-      CORS_ORIGINS: "http://localhost:3000"
+      CORS_ORIGINS: "http://localhost:3000,http://0.0.0.0:3000,http://127.0.0.1:3000"
     ports:
       - "8888:8888"
-  # minio:
-  #   image: minio/minio:latest
-  #   ports:
-  #     - "9000:9000"
-  #   environment:
-  #     MINIO_ACCESS_KEY: minioadmin
-  #     MINIO_SECRET_KEY: minioadmin
-  #   command: ["minio", "server", "/data"]
-  #   volumes:
-  #     - minio_data:/data
-  # load:
-  #   image: minio-client:latest
-  #   command: ["sleep", "infinity"]
+    networks:
+      - ppe
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001" # MinIO Console port
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_SERVER_URL=http://minio:9000
+    command: server /data --console-address ":9001"
+    networks:
+      - ppe
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - minio_data:/data
 
   frontend:
     build:
@@ -32,13 +46,19 @@ services:
     image: ppe-compliance-monitor-frontend:local
     depends_on:
       - backend
+    networks:
+      - ppe
     environment:
       FRONTEND_API_URL: "http://localhost:8888/api"
     command:
       - sh
       - -c
       - >
-        printf "window.__ENV__ = { API_URL: \"%s\" };\n" "$${FRONTEND_API_URL}" > /app/build/env.js
-        && serve -s /app/build -l tcp://0.0.0.0:3000
+        printf "window.__ENV__ = { API_URL: \"%s\" };\n" "$${FRONTEND_API_URL}" > /app/build/env.js && serve -s /app/build -l tcp://0.0.0.0:3000 #magic___^_^___line
     ports:
       - "3000:3000"
+
+
+volumes:
+  minio_data:
+  model_repo:
