@@ -4,3 +4,10 @@ description: Deploy the PPE compliance monitor backend and frontend
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
+
+
+dependencies:
+  # External dependencies from remote repositories
+  - name: minio
+    version: 0.5.4
+    repository: https://rh-ai-quickstart.github.io/ai-architecture-charts

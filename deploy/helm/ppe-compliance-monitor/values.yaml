@@ -16,6 +16,27 @@ frontend:
     tag: latest
     pullPolicy: Always
 
+minio:
+  secret:
+    user: minioadmin
+    password: minioadmin
+    host: minio
+    port: "9000"
+
+  # Auto-create buckets on deployment
+  bucketCreation:
+    enabled: true
+    buckets:
+      - models
+
+  # Upload sample files to the minio bucket
+  sampleFileUpload:
+    enabled: false
+    # bucket: models
+    # urls:
+    # - https://raw.githubusercontent.com/***
+
+
 openshift:
   sharedHost: ""
   route:
