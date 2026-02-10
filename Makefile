@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help local-up local-build-up local-down build push deploy undeploy dev-backend dev-frontend ensure-assets local-build
+.PHONY: help local-up local-build-up local-down build push deploy undeploy dev-backend dev-frontend ensure-assets local-build build-push-data
 help:
 	@echo "Available targets:"
 	@echo "  local-up   - Start local stack with Podman Compose"
@@ -7,6 +7,7 @@ help:
 	@echo "  local-down - Stop local stack"
 	@echo "  build      - Build container image"
 	@echo "  push       - Push container image"
+	@echo "  build-push-data - Build and push data container image (video + models)"
 	@echo "  deploy     - Deploy manifests to OpenShift"
 	@echo "  undeploy   - Remove manifests from OpenShift"
 	@echo "  dev-backend - Create venv, install deps, run backend"
@@ -25,8 +26,10 @@ IMAGE_REGISTRY ?= quay.io/rh-ai-quickstart
 IMAGE_REPOSITORY := $(if $(IMAGE_REGISTRY),$(IMAGE_REGISTRY)/,)$(IMAGE_NAME)
 BACKEND_IMAGE := $(IMAGE_REPOSITORY)-backend:$(IMAGE_TAG)
 FRONTEND_IMAGE := $(IMAGE_REPOSITORY)-frontend:$(IMAGE_TAG)
+DATA_IMAGE := $(IMAGE_REPOSITORY)-data:$(IMAGE_TAG)
 LOCAL_BACKEND_IMAGE ?= ppe-compliance-monitor-backend:local
 LOCAL_FRONTEND_IMAGE ?= ppe-compliance-monitor-frontend:local
+LOCAL_DATA_IMAGE ?= ppe-compliance-monitor-data:local
 PYTHON ?= python3
 VENV_DIR ?= .venv
 BACKEND_DIR ?= app/backend
@@ -67,6 +70,10 @@ push:
 		exit 1; \
 	fi
 
+build-push-data:
+	podman build --platform $(PLATFORM_RELEASE) -t $(DATA_IMAGE) -f app/data-image/Dockerfile app
+	podman push $(DATA_IMAGE)
+
 deploy:
 	@domain=$$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}' 2>/dev/null || true); \
 	if [ -n "$(NAMESPACE)" ]; then oc new-project "$(NAMESPACE)" --display-name="$(NAMESPACE)" >/dev/null 2>&1 || oc project "$(NAMESPACE)"; fi; \
@@ -81,6 +88,8 @@ deploy:
 		--set backend.image.tag=$(IMAGE_TAG) \
 		--set frontend.image.repository=$(IMAGE_REPOSITORY)-frontend \
 		--set frontend.image.tag=$(IMAGE_TAG) \
+		--set data.image.repository=$(IMAGE_REPOSITORY)-data \
+		--set data.image.tag=$(IMAGE_TAG) \
 		$${host:+--set openshift.sharedHost=$$host}
 
 undeploy:

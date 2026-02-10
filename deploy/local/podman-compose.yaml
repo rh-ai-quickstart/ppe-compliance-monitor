@@ -3,15 +3,40 @@ version: "3.8"
 networks:
   ppe:
 
+
 services:
+  # Init service: loads model and video files into shared volume
+  data-loader:
+    build:
+      context: ../../app
+      dockerfile: data-image/Dockerfile
+    image: ppe-compliance-monitor-data:local
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /shared/data /shared/models
+        cp -r /data/* /shared/data/
+        cp -r /models/* /shared/models/
+        echo "Data loaded successfully"
+    volumes:
+      - shared-data:/shared
+
   backend:
     build:
       context: ../../app
       dockerfile: backend/Dockerfile
     image: ppe-compliance-monitor-backend:local
     command: ["python", "/app/backend/app.py"]
+    depends_on:
+      data-loader:
+        condition: service_completed_successfully
     environment:
       CORS_ORIGINS: "http://localhost:3000,http://0.0.0.0:3000,http://127.0.0.1:3000"
+      MODEL_PATH: /app/shared/models/ppe.pt
+      VIDEO_PATH: /app/shared/data/combined-video-no-gap-rooftop.mp4
+    volumes:
+      - shared-data:/app/shared
     ports:
       - "8888:8888"
     networks:
@@ -60,5 +85,6 @@ services:
 
 
 volumes:
+  shared-data:
   minio_data:
   model_repo:

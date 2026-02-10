@@ -37,6 +37,12 @@ minio:
     # - https://raw.githubusercontent.com/***
 
 
+data:
+  image:
+    repository: ppe-compliance-monitor-data
+    tag: latest
+    pullPolicy: Always
+
 openshift:
   sharedHost: ""
   route:
