@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help local-up local-build-up local-down build push deploy undeploy dev-backend dev-frontend ensure-assets local-build build-push-data
+.PHONY: help local-up local-build-up local-down build push deploy undeploy dev-backend dev-frontend local-build build-push-data
 help:
 	@echo "Available targets:"
 	@echo "  local-up   - Start local stack with Podman Compose"
@@ -12,7 +12,6 @@ help:
 	@echo "  undeploy   - Remove manifests from OpenShift"
 	@echo "  dev-backend - Create venv, install deps, run backend"
 	@echo "  dev-frontend - Install deps and run frontend"
-	@echo "  ensure-assets - Unpack model/video assets if missing"
 
 
 COMPOSE_FILE ?= $(CURDIR)/deploy/local/podman-compose.yaml
@@ -37,10 +36,10 @@ FRONTEND_DIR ?= app/frontend
 HELM_RELEASE ?= ppe-compliance-monitor
 HELM_CHART ?= deploy/helm/ppe-compliance-monitor
 
-local-up: ensure-assets local-build
+local-up: local-build
 	PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) up
 
-local-build-up: ensure-assets
+local-build-up:
 	PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) up --build
 
 local-build:
@@ -57,7 +56,7 @@ local-build:
 local-down:
 	podman-compose -f $(COMPOSE_FILE) down
 
-build: ensure-assets
+build:
 	podman build --platform $(PLATFORM_RELEASE) -t $(BACKEND_IMAGE) -f app/backend/Dockerfile app
 	podman build --platform $(PLATFORM_RELEASE) -t $(FRONTEND_IMAGE) -f app/frontend/Dockerfile app/frontend
 
@@ -96,20 +95,10 @@ undeploy:
 	@if [ -n "$(NAMESPACE)" ]; then oc project "$(NAMESPACE)"; fi
 	helm uninstall $(HELM_RELEASE) --namespace $(NAMESPACE)
 
-dev-backend: ensure-assets
+dev-backend:
 	$(PYTHON) -m venv $(VENV_DIR)
 	. $(VENV_DIR)/bin/activate && pip install -r $(BACKEND_DIR)/requirements.txt
 	. $(VENV_DIR)/bin/activate && $(PYTHON) $(BACKEND_DIR)/app.py
-
-ensure-assets:
-	@if [ ! -f app/models/custome_ppe.pt ]; then \
-		echo "Missing app/models/custome_ppe.pt; running app/models/unzip.sh"; \
-		cd app/models && sh ./unzip.sh; \
-	fi
-	@if [ ! -f app/data/combined-video-no-gap-rooftop.mp4 ]; then \
-		echo "Missing app/data/combined-video-no-gap-rooftop.mp4; running app/data/unzip.sh"; \
-		cd app/data && sh ./unzip.sh; \
-	fi
 
 dev-frontend:
 	cd $(FRONTEND_DIR) && npm install
