@@ -15,3 +15,4 @@ pyyaml
 tqdm
 ultralytics
 cvzone
+minio

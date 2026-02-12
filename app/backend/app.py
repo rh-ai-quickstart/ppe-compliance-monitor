@@ -7,6 +7,8 @@ from transformers import pipeline
 from chatbot import generate_response
 import traceback
 import os
+import tempfile
+from minio_client import download_file, is_minio_enabled
 
 
 app = Flask(__name__)
@@ -23,12 +25,31 @@ else:
 CORS(app, resources={r"/*": {"origins": cors_allowed_origins}})
 
 
-default_video_path = os.path.abspath(
-    os.path.join(
-        os.path.dirname(__file__), "..", "data", "combined-video-no-gap-rooftop.mp4"
-    )
-)
-video_path = os.getenv("VIDEO_PATH", default_video_path)
+def get_video_path():
+    """
+    Get video path, downloading from MinIO if enabled.
+    
+    When MINIO_ENABLED=true: Downloads video from MinIO to a temp directory.
+        - Used for local development with podman-compose
+    When MINIO_ENABLED=false: Uses VIDEO_PATH environment variable.
+        - Used for Kubernetes/OpenShift where files are pre-downloaded to PVC
+    """
+    if is_minio_enabled():
+        bucket = os.getenv("MINIO_VIDEO_BUCKET", "data")
+        object_name = os.getenv("MINIO_VIDEO_KEY", "combined-video-no-gap-rooftop.mp4")
+        local_path = os.path.join(tempfile.gettempdir(), "minio_cache", "video", object_name)
+        return download_file(bucket, object_name, local_path)
+    else:
+        # Fallback to local files for development without MinIO
+        default_video_path = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__), "..", "data", "combined-video-no-gap-rooftop.mp4"
+            )
+        )
+        return os.getenv("VIDEO_PATH", default_video_path)
+
+
+video_path = get_video_path()
 demo = MultiModalAIDemo(video_path)
 demo.setup_components()
 

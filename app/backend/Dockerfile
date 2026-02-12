@@ -14,8 +14,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./
 
 WORKDIR /app
-COPY models/*.pt /app/models/
-COPY data/*.mp4 /app/data/
+
+# Model and video files are NOT included in this image.
+# For OpenShift/Kubernetes: Files are downloaded from MinIO to a PVC by init container.
+# For local development: Use podman-compose which mounts files via volumes or downloads from MinIO.
 
 ENV PYTHONPATH=/app
 ENV TRANSFORMERS_CACHE=/tmp/.cache/huggingface

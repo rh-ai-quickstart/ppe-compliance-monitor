@@ -3,7 +3,7 @@ backend:
   port: 8888
   corsOrigins: ""
   image:
-    repository: ppe-compliance-monitor-backend
+    repository: quay.io/rh-ai-quickstart/ppe-compliance-monitor-backend
     tag: latest
     pullPolicy: Always
 
@@ -12,7 +12,7 @@ frontend:
   port: 3000
   apiUrl: ""
   image:
-    repository: ppe-compliance-monitor-frontend
+    repository: quay.io/rh-ai-quickstart/ppe-compliance-monitor-frontend
     tag: latest
     pullPolicy: Always
 
@@ -28,6 +28,7 @@ minio:
     enabled: true
     buckets:
       - models
+      - data
 
   # Upload sample files to the minio bucket
   sampleFileUpload:
@@ -36,10 +37,21 @@ minio:
     # urls:
     # - https://raw.githubusercontent.com/***
 
+# MinIO storage configuration for model and video files
+storage:
+  enabled: true
+  # PVC size for storing downloaded model and video files
+  size: 1Gi
+  model:
+    bucket: models
+    key: ppe.pt
+  video:
+    bucket: data
+    key: combined-video-no-gap-rooftop.mp4
 
 data:
   image:
-    repository: ppe-compliance-monitor-data
+    repository: quay.io/rh-ai-quickstart/ppe-compliance-monitor-data
     tag: latest
     pullPolicy: Always
 

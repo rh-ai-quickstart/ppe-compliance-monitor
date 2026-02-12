@@ -4,6 +4,30 @@ import torch
 from ultralytics import YOLO
 from collections import defaultdict
 import os
+import tempfile
+from minio_client import download_file, is_minio_enabled
+
+
+def get_model_path():
+    """
+    Get model path, downloading from MinIO if enabled.
+    
+    When MINIO_ENABLED=true: Downloads model from MinIO to a temp directory.
+        - Used for local development with podman-compose
+    When MINIO_ENABLED=false: Uses MODEL_PATH environment variable.
+        - Used for Kubernetes/OpenShift where files are pre-downloaded to PVC
+    """
+    if is_minio_enabled():
+        bucket = os.getenv("MINIO_MODEL_BUCKET", "models")
+        object_name = os.getenv("MINIO_MODEL_KEY", "ppe.pt")
+        local_path = os.path.join(tempfile.gettempdir(), "minio_cache", "models", object_name)
+        return download_file(bucket, object_name, local_path)
+    else:
+        # Fallback to local files for development without MinIO
+        default_model_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "models", "ppe.pt")
+        )
+        return os.getenv("MODEL_PATH", default_model_path)
 
 
 class MultiModalAIDemo:
@@ -36,10 +60,7 @@ class MultiModalAIDemo:
     def setup_components(self):
         """Load models and initialize runtime components."""
         self.cap = cv2.VideoCapture(self.video_path)
-        default_model_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "models", "ppe.pt")
-        )
-        model_path = os.getenv("MODEL_PATH", default_model_path)
+        model_path = get_model_path()
         self.anomaly_detector = YOLO(model_path)
         print("Model classes:", self.anomaly_detector.names)
         self.class_names = list(self.anomaly_detector.names.values())
