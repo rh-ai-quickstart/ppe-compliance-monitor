@@ -1,0 +1,16 @@
+{{- if .Values.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ppe-compliance-monitor.fullname" . }}-data
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.storage.size | default "2Gi" }}
+{{- end }}
+

@@ -5,45 +5,8 @@ networks:
 
 
 services:
-  # Init service: loads model and video files into shared volume
-  data-loader:
-    build:
-      context: ../../app
-      dockerfile: data-image/Dockerfile
-    image: ppe-compliance-monitor-data:local
-    command:
-      - sh
-      - -c
-      - |
-        mkdir -p /shared/data /shared/models
-        cp -r /data/* /shared/data/
-        cp -r /models/* /shared/models/
-        echo "Data loaded successfully"
-    volumes:
-      - shared-data:/shared
-
-  backend:
-    build:
-      context: ../../app
-      dockerfile: backend/Dockerfile
-    image: ppe-compliance-monitor-backend:local
-    command: ["python", "/app/backend/app.py"]
-    depends_on:
-      data-loader:
-        condition: service_completed_successfully
-    environment:
-      CORS_ORIGINS: "http://localhost:3000,http://0.0.0.0:3000,http://127.0.0.1:3000"
-      MODEL_PATH: /app/shared/models/ppe.pt
-      VIDEO_PATH: /app/shared/data/combined-video-no-gap-rooftop.mp4
-    volumes:
-      - shared-data:/app/shared
-    ports:
-      - "8888:8888"
-    networks:
-      - ppe
-
   minio:
-    image: minio/minio:latest
+    image: docker.io/minio/minio:latest
     container_name: minio
     ports:
       - "9000:9000"
@@ -57,12 +20,54 @@ services:
       - ppe
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
     volumes:
       - minio_data:/data
+
+  # Init service: uploads model and video files to MinIO (idempotent)
+  data-loader:
+    build:
+      context: ../../app
+      dockerfile: data-image/Dockerfile
+    image: ppe-compliance-monitor-data:local
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    networks:
+      - ppe
+
+  backend:
+    build:
+      context: ../../app
+      dockerfile: backend/Dockerfile
+    image: ppe-compliance-monitor-backend:local
+    command: ["python", "/app/backend/app.py"]
+    depends_on:
+      data-loader:
+        condition: service_completed_successfully
+    environment:
+      CORS_ORIGINS: "http://localhost:3000,http://0.0.0.0:3000,http://127.0.0.1:3000"
+      # MinIO configuration
+      MINIO_ENABLED: "true"
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_SECURE: "false"
+      MINIO_MODEL_BUCKET: models
+      MINIO_MODEL_KEY: ppe.pt
+      MINIO_VIDEO_BUCKET: data
+      MINIO_VIDEO_KEY: combined-video-no-gap-rooftop.mp4
+    ports:
+      - "8888:8888"
+    networks:
+      - ppe
 
   frontend:
     build:
@@ -85,6 +90,4 @@ services:
 
 
 volumes:
-  shared-data:
   minio_data:
-  model_repo:

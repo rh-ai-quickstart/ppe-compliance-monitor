@@ -13,9 +13,47 @@ and include that in the reported safety summary.
 
 ## Architecture
 
-- Backend (Flask, OpenCV, Ultralytics): video processing, detection, summaries.
-- Frontend (React): UI for live feed, summaries, and chat.
-- Container build: separate backend and frontend images.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              MinIO Object Storage                            │
+│  ┌─────────────────────┐           ┌─────────────────────────────────────┐  │
+│  │  models bucket      │           │  data bucket                        │  │
+│  │  └── ppe.pt (84MB)  │           │  └── combined-video-no-gap-...mp4   │  │
+│  └─────────────────────┘           └─────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                    ▲                              │
+                    │ upload (init)                │ download (init)
+                    │                              ▼
+┌───────────────────┴─────────┐    ┌──────────────────────────────────────────┐
+│     data-loader container   │    │           Backend Container               │
+│  - Uploads model to MinIO   │    │  - Reads model/video from PVC (K8s)      │
+│  - Uploads video to MinIO   │    │  - Or downloads from MinIO (local)       │
+│  - Idempotent               │    │  - Flask API on port 8888                │
+└─────────────────────────────┘    └──────────────────────────────────────────┘
+                                                    │
+                                                    ▼
+                                   ┌──────────────────────────────────────────┐
+                                   │         Frontend Container                │
+                                   │  - React App on port 3000                │
+                                   │  - Video feed, dashboard, chat           │
+                                   └──────────────────────────────────────────┘
+```
+
+### Components
+
+- **Backend** (Flask, OpenCV, Ultralytics): video processing, detection, summaries
+- **Frontend** (React): UI for live feed, summaries, and chat
+- **MinIO**: S3-compatible object storage for model and video files
+- **Data Loader**: Init container that uploads files to MinIO
+
+### Storage Strategy
+
+Model (`ppe.pt`) and video files are stored in MinIO rather than baked into container images:
+
+| Deployment | Storage Method |
+|------------|----------------|
+| OpenShift/K8s | Files downloaded from MinIO to PVC by init container |
+| Local (Podman) | Files downloaded from MinIO at runtime via Python client |
 
 ## Prerequisites
 
@@ -33,72 +71,98 @@ Backend environment variables:
 Frontend runtime config (`app/frontend/public/env.js` or mounted in containers):
 - `API_URL`: backend base URL (example: `http://localhost:8888`)
 
-## Local (Podman Compose)
+## Local Development (Podman Compose)
 
-Build and run:
+### Build and Run
 
-```
+```bash
 make local-build-up
 ```
 
-Run without forcing a rebuild (builds only if missing):
+This starts:
+1. **MinIO** - Object storage (ports 9000, 9001)
+2. **data-loader** - Uploads model/video to MinIO (runs once)
+3. **backend** - Flask API with `MINIO_ENABLED=true` (port 8888)
+4. **frontend** - React app (port 3000)
 
-```
+### Run Without Rebuild
+
+```bash
 make local-up
 ```
 
-Stop:
+### Stop
 
-```
+```bash
 make local-down
 ```
 
-Access:
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:8888`
+### Access
 
-## Local (No Containers)
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8888/api/
+- MinIO Console: http://localhost:9001 (login: `minioadmin` / `minioadmin`)
 
-Backend:
+## Local Development (No Containers)
 
-```
+### Backend
+
+```bash
 make dev-backend
 ```
 
-Frontend:
+Note: Requires model and video files in `app/models/` and `app/data/` directories.
 
-```
+### Frontend
+
+```bash
 make dev-frontend
 ```
 
-## OpenShift
+## OpenShift/Kubernetes Deployment
 
-Build and push images:
+### Build and Push Images
 
-```
+```bash
+# Build backend and frontend images
 make build
+
+# Push to registry
 make push
+
+# Build and push data loader image (contains model/video for MinIO upload)
+make build-push-data
 ```
 
-Deploy and undeploy:
+### Deploy
 
-```
-make deploy
-make undeploy
-```
-
-You can override the namespace or image tag:
-
-```
-make deploy NAMESPACE=<your-namespace> IMAGE_TAG=<tag>
+```bash
+make deploy NAMESPACE=<your-namespace>
 ```
 
-Override API URLs or CORS (Helm values):
+### Undeploy
 
+```bash
+make undeploy NAMESPACE=<your-namespace>
 ```
+
+### Deployment Workflow
+
+1. **MinIO** starts (from `ai-architecture-charts` dependency)
+2. **Backend Pod Init Container 1** (`upload-data`): Uploads model/video to MinIO
+3. **Backend Pod Init Container 2** (`download-data`): Downloads files from MinIO to PVC
+4. **Backend** starts with `MINIO_ENABLED=false`, reads from PVC paths
+5. **Frontend** connects to backend API
+
+### Helm Values
+
+Override settings:
+
+```bash
 helm upgrade ppe-compliance-monitor deploy/helm/ppe-compliance-monitor \
   --set frontend.apiUrl=/api \
-  --set backend.corsOrigins=http://your-frontend-host
+  --set backend.corsOrigins=http://your-frontend-host \
+  --set storage.size=2Gi
 ```
 
 OpenShift-specific options are included in the chart:
@@ -110,10 +174,13 @@ OpenShift-specific options are included in the chart:
 
 ## API Endpoints
 
-- `GET /video_feed`: MJPEG video stream
-- `GET /latest_info`: latest description and summary
-- `POST /ask_question`: question answering based on latest context
-- `POST /chat`: rule-based response using latest detections and summary
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/` | GET | Health check |
+| `/api/video_feed` | GET | MJPEG video stream |
+| `/api/latest_info` | GET | Latest description and summary |
+| `/api/ask_question` | POST | Question answering based on context |
+| `/api/chat` | POST | Rule-based response using detections |
 
 ### Example request
 

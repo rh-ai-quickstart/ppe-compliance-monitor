@@ -1,5 +1,5 @@
 # Dockerfile for ppe-compliance-monitor-data
-# Contains video and model files for the PPE compliance monitor
+# Uploads model and video files to MinIO (idempotent - skips if already exists)
 
 # Stage 1: Extract compressed archives
 FROM alpine:3.19 AS extractor
@@ -19,25 +19,23 @@ RUN cd data && 7z x combined-video-no-gap-rooftop.mp4.7z.001
 # Copy the existing ppe.pt model (not compressed)
 COPY models/ppe.pt ./models/
 
-# Stage 2: Create minimal final image with extracted files
-FROM busybox:1.36
+# Stage 2: Create uploader image with mc CLI
+FROM docker.io/minio/mc:latest
 
-WORKDIR /
+WORKDIR /upload
 
-# Copy extracted files to final locations
-COPY --from=extractor /extract/data/combined-video-no-gap-rooftop.mp4 /data/
-COPY --from=extractor /extract/models/custome_ppe.pt /models/
-COPY --from=extractor /extract/models/ppe.pt /models/
+# Copy extracted files from extractor stage
+COPY --from=extractor /extract/data/combined-video-no-gap-rooftop.mp4 /upload/data/
+COPY --from=extractor /extract/models/custome_ppe.pt /upload/models/
+COPY --from=extractor /extract/models/ppe.pt /upload/models/
 
-# Set read permissions
-RUN chmod -R 644 /data/* /models/*
+# Copy upload script
+COPY data-image/upload.sh /upload/upload.sh
+RUN chmod +x /upload/upload.sh
 
-# Default command just lists the contents. Output looks like this:
-#PPE Compliance Monitor Data Container
-#--- /data ---
-#-rw-r--r--    1 root  root  500M  combined-video-no-gap-rooftop.mp4
-#--- /models ---
-#-rw-r--r--    1 root  root  150M  custome_ppe.pt
-#-rw-r--r--    1 root  root  100M  ppe.pt
-CMD ["sh", "-c", "echo 'PPE Compliance Monitor Data Container' && echo '--- /data ---' && ls -lh /data && echo '--- /models ---' && ls -lh /models"]
+# Default environment variables (can be overridden)
+ENV MINIO_ENDPOINT=http://minio:9000
+ENV MINIO_ACCESS_KEY=minioadmin
+ENV MINIO_SECRET_KEY=minioadmin
 
+ENTRYPOINT ["/bin/sh", "/upload/upload.sh"]
