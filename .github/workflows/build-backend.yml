@@ -1,0 +1,26 @@
+name: Build and Push Backend Image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/backend/**'
+      - '.github/workflows/build-backend.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/backend/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image_name: rh-ai-quickstart/ppe-compliance-monitor-backend
+      context: ./app
+      dockerfile: ./app/backend/Dockerfile
+    secrets:
+      QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}

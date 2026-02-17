@@ -1,0 +1,26 @@
+name: Build and Push Frontend Image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/frontend/**'
+      - '.github/workflows/build-frontend.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/frontend/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image_name: rh-ai-quickstart/ppe-compliance-monitor-frontend
+      context: ./app/frontend
+      dockerfile: ./app/frontend/Dockerfile
+    secrets:
+      QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}

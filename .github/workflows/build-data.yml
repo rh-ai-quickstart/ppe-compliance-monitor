@@ -1,0 +1,31 @@
+name: Build and Push Data Image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/data-image/**'
+      - 'app/models/**'
+      - 'app/data/**'
+      - '.github/workflows/build-data.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/data-image/**'
+      - 'app/models/**'
+      - 'app/data/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image_name: rh-ai-quickstart/ppe-compliance-monitor-data
+      context: ./app
+      dockerfile: ./app/data-image/Dockerfile
+      use_lfs: true
+    secrets:
+      QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
