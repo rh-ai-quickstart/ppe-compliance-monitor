@@ -17,6 +17,9 @@ on:
 jobs:
   build:
     uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
     with:
       image_name: rh-ai-quickstart/ppe-compliance-monitor-frontend
       context: ./app/frontend
