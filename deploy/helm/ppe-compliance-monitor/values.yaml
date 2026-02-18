@@ -49,6 +49,19 @@ storage:
     bucket: data
     key: combined-video-no-gap-rooftop.mp4
 
+# PostgreSQL database for tracking data persistence
+postgresql:
+  enabled: true
+  # Database connection settings
+  host: "postgresql"
+  port: "5432"
+  database: "ppe_tracking"
+  user: "ppe_user"
+  password: "ppe_password"
+  # PVC size for PostgreSQL data
+  storage:
+    size: 5Gi
+
 data:
   image:
     repository: quay.io/rh-ai-quickstart/ppe-compliance-monitor-data

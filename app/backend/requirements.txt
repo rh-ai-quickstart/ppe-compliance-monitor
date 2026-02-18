@@ -16,3 +16,5 @@ tqdm
 ultralytics
 cvzone
 minio
+deep-sort-realtime
+psycopg2-binary

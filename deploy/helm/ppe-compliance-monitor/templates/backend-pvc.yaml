@@ -13,4 +13,19 @@ spec:
     requests:
       storage: {{ .Values.storage.size | default "2Gi" }}
 {{- end }}
-
+---
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ppe-compliance-monitor.fullname" . }}-postgresql
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.storage.size | default "5Gi" }}
+{{- end }}

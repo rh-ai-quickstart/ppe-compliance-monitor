@@ -3,9 +3,17 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
 from ultralytics import YOLO
 from collections import defaultdict
+from datetime import datetime
 import os
 import tempfile
 from minio_client import download_file, is_minio_enabled
+from deep_sort_realtime.deepsort_tracker import DeepSort
+from database import (
+    init_database, 
+    insert_person, 
+    update_person_last_seen, 
+    insert_observation
+)
 
 
 def get_model_path():
@@ -56,6 +64,16 @@ class MultiModalAIDemo:
         self.ppe_stats = defaultdict(lambda: {"compliant": 0, "non_compliant": 0})
         self.latest_detection = defaultdict(int)
         self.latest_summary = ""
+        
+        # Object tracking and per-person PPE tracking
+        self.tracker = None
+        self.person_history = {}  # {track_id: {"first_seen": datetime, "last_seen": datetime}}
+        self.person_observations = []  # List of per-person PPE observations with timestamps
+        self.latest_tracked_persons = []  # Most recent frame's tracked persons with PPE status
+        
+        # State-change tracking: only record when PPE status changes
+        # {track_id: (hardhat, vest, mask)} - last known PPE state for each person
+        self.person_last_state = {}
 
     def setup_components(self):
         """Load models and initialize runtime components."""
@@ -72,6 +90,16 @@ class MultiModalAIDemo:
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.summarizer_model.to(self.device)
+        
+        # Initialize DeepSORT tracker for person tracking
+        # max_age: frames to keep track alive without detection
+        # n_init: frames before track is confirmed
+        self.tracker = DeepSort(max_age=30, n_init=3)
+        print("Object tracker initialized (DeepSORT)")
+        
+        # Initialize SQLite database for persistent storage
+        init_database()
+        print("SQLite database initialized")
 
     def format_detection_description(self, detections):
         """Build a short, human-readable description from detection counts."""
@@ -190,6 +218,122 @@ class MultiModalAIDemo:
         """Return the most recent summary."""
         return self.latest_summary
 
+    def get_latest_tracked_persons(self):
+        """Return the most recent tracked persons with their PPE status."""
+        return self.latest_tracked_persons
+
+    def get_person_history(self):
+        """Return the history of all tracked persons."""
+        return self.person_history
+
+    def get_person_observations(self):
+        """Return all person observations (for database storage in Step 2)."""
+        return self.person_observations
+
+    def get_unique_person_count(self):
+        """Return the count of unique persons tracked so far."""
+        return len(self.person_history)
+
+    @staticmethod
+    def _boxes_overlap(box1, box2):
+        """
+        Check if two bounding boxes overlap.
+        
+        Args:
+            box1: (x1, y1, x2, y2) tuple
+            box2: (x1, y1, x2, y2) tuple
+            
+        Returns:
+            True if boxes overlap, False otherwise
+        """
+        x1_1, y1_1, x2_1, y2_1 = box1
+        x1_2, y1_2, x2_2, y2_2 = box2
+        
+        # Check if boxes don't overlap
+        if x2_1 < x1_2 or x2_2 < x1_1:  # One is to the left of the other
+            return False
+        if y2_1 < y1_2 or y2_2 < y1_1:  # One is above the other
+            return False
+        
+        return True
+
+    @staticmethod
+    def _calculate_iou(box1, box2):
+        """
+        Calculate Intersection over Union (IoU) between two bounding boxes.
+        
+        Args:
+            box1: (x1, y1, x2, y2) tuple
+            box2: (x1, y1, x2, y2) tuple
+            
+        Returns:
+            IoU value between 0 and 1
+        """
+        x1_1, y1_1, x2_1, y2_1 = box1
+        x1_2, y1_2, x2_2, y2_2 = box2
+        
+        # Calculate intersection
+        x1_i = max(x1_1, x1_2)
+        y1_i = max(y1_1, y1_2)
+        x2_i = min(x2_1, x2_2)
+        y2_i = min(y2_1, y2_2)
+        
+        if x2_i < x1_i or y2_i < y1_i:
+            return 0.0
+        
+        intersection = (x2_i - x1_i) * (y2_i - y1_i)
+        
+        # Calculate union
+        area1 = (x2_1 - x1_1) * (y2_1 - y1_1)
+        area2 = (x2_2 - x1_2) * (y2_2 - y1_2)
+        union = area1 + area2 - intersection
+        
+        if union == 0:
+            return 0.0
+        
+        return intersection / union
+
+    def _associate_ppe_to_person(self, person_bbox, all_detections):
+        """
+        Determine PPE status for a specific person based on bounding box overlap.
+        
+        Args:
+            person_bbox: (x1, y1, x2, y2) bounding box of the tracked person
+            all_detections: list of all YOLO detections in the frame
+            
+        Returns:
+            dict with PPE status: {"hardhat": True/False/None, "vest": True/False/None, "mask": True/False/None}
+        """
+        status = {
+            "hardhat": None,  # None means unknown/not visible
+            "vest": None,
+            "mask": None
+        }
+        
+        # PPE class mapping
+        ppe_mapping = {
+            "Hardhat": ("hardhat", True),
+            "NO-Hardhat": ("hardhat", False),
+            "Safety Vest": ("vest", True),
+            "NO-Safety Vest": ("vest", False),
+            "Mask": ("mask", True),
+            "NO-Mask": ("mask", False),
+        }
+        
+        for det in all_detections:
+            class_name = det["class_name"]
+            if class_name in ppe_mapping:
+                ppe_bbox = det["bbox"]
+                
+                # Check if PPE bbox overlaps with person bbox
+                if self._boxes_overlap(person_bbox, ppe_bbox):
+                    ppe_type, ppe_value = ppe_mapping[class_name]
+                    # Only update if not already set, or if this detection has higher confidence
+                    if status[ppe_type] is None:
+                        status[ppe_type] = ppe_value
+        
+        return status
+
     def capture_and_update(self, resize_to=None):
         """Capture a frame, optionally resize, update detection state, and return frame data."""
         success, frame = self.cap.read()
@@ -223,6 +367,101 @@ class MultiModalAIDemo:
         self.latest_detection = counts
         description = self.format_detection_description(counts)
         self.append_description(description)
+
+        # --- Object Tracking and PPE Association ---
+        # Prepare person detections for the tracker
+        # DeepSORT expects: list of ([x, y, w, h], confidence, class_name)
+        person_detections_for_tracker = []
+        for det in detections:
+            if det["class_name"] == "Person":
+                x1, y1, x2, y2 = det["bbox"]
+                # Convert to [x, y, width, height] format
+                w = x2 - x1
+                h = y2 - y1
+                person_detections_for_tracker.append(
+                    ([x1, y1, w, h], det["confidence"], "person")
+                )
+        
+        # Update tracker with person detections
+        tracked_persons = []
+        now = datetime.now()
+        
+        if self.tracker is not None and person_detections_for_tracker:
+            tracks = self.tracker.update_tracks(person_detections_for_tracker, frame=frame)
+            
+            for track in tracks:
+                if not track.is_confirmed():
+                    continue
+                
+                track_id = track.track_id
+                # Get bounding box in (x1, y1, x2, y2) format
+                ltrb = track.to_ltrb()
+                person_bbox = (int(ltrb[0]), int(ltrb[1]), int(ltrb[2]), int(ltrb[3]))
+                
+                # Update person history (first/last seen)
+                if track_id not in self.person_history:
+                    self.person_history[track_id] = {
+                        "first_seen": now,
+                        "last_seen": now
+                    }
+                    # Persist new person to SQLite
+                    insert_person(track_id, now, now)
+                else:
+                    self.person_history[track_id]["last_seen"] = now
+                    # Update last_seen in SQLite
+                    update_person_last_seen(track_id, now)
+                
+                # Associate PPE with this person
+                ppe_status = self._associate_ppe_to_person(person_bbox, detections)
+                
+                tracked_person = {
+                    "track_id": track_id,
+                    "bbox": person_bbox,
+                    "hardhat": ppe_status["hardhat"],
+                    "vest": ppe_status["vest"],
+                    "mask": ppe_status["mask"],
+                    "timestamp": now
+                }
+                tracked_persons.append(tracked_person)
+                
+                # --- State-Change Recording ---
+                # Only record observation if PPE state has changed (or first appearance)
+                current_state = (ppe_status["hardhat"], ppe_status["vest"], ppe_status["mask"])
+                last_state = self.person_last_state.get(track_id)
+                
+                # Record if: new person OR state changed
+                if last_state is None or last_state != current_state:
+                    # Record observation for historical tracking
+                    self.person_observations.append({
+                        "track_id": track_id,
+                        "timestamp": now,
+                        "hardhat": ppe_status["hardhat"],
+                        "vest": ppe_status["vest"],
+                        "mask": ppe_status["mask"],
+                        "bbox": person_bbox
+                    })
+                    # Persist observation to SQLite
+                    insert_observation(
+                        track_id=track_id,
+                        timestamp=now,
+                        hardhat=ppe_status["hardhat"],
+                        vest=ppe_status["vest"],
+                        mask=ppe_status["mask"]
+                    )
+                    # Update last known state
+                    self.person_last_state[track_id] = current_state
+                    
+                    if last_state is None:
+                        print(f"[STATE] New person {track_id}: hardhat={ppe_status['hardhat']}, vest={ppe_status['vest']}, mask={ppe_status['mask']}")
+                    else:
+                        print(f"[STATE] Person {track_id} state changed: {last_state} -> {current_state}")
+                
+                # Limit observation history in memory (keep last 1000 observations)
+                if len(self.person_observations) > 1000:
+                    self.person_observations = self.person_observations[-1000:]
+        
+        self.latest_tracked_persons = tracked_persons
+        # --- End Object Tracking ---
 
         if self.frame_count % 50 == 0:
             self.latest_summary = self.generate_summary(self.description_buffer)
