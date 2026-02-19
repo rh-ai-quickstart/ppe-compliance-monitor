@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help local-up local-build-up local-down build push deploy undeploy dev-backend dev-frontend local-build build-push-data
+.PHONY: help local-up local-build-up local-down build push deploy undeploy dev-backend dev-frontend local-build build-push-data kill-ports
 help:
 	@echo "Available targets:"
 	@echo "  local-up   - Start local stack with Podman Compose"
@@ -12,6 +12,7 @@ help:
 	@echo "  undeploy   - Remove manifests from OpenShift"
 	@echo "  dev-backend - Create venv, install deps, run backend"
 	@echo "  dev-frontend - Install deps and run frontend"
+	@echo "  kill-ports   - Kill processes using required ports (3000, 8888, 8080, 8081, 9000, 9001)"
 
 
 COMPOSE_FILE ?= $(CURDIR)/deploy/local/podman-compose.yaml
@@ -36,10 +37,10 @@ FRONTEND_DIR ?= app/frontend
 HELM_RELEASE ?= ppe-compliance-monitor
 HELM_CHART ?= deploy/helm/ppe-compliance-monitor
 
-local-up: local-build
+local-up: local-build kill-ports
 	PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) up
 
-local-build-up:
+local-build-up: kill-ports
 	PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) up --build
 
 local-build:
@@ -103,3 +104,43 @@ dev-backend:
 dev-frontend:
 	cd $(FRONTEND_DIR) && npm install
 	cd $(FRONTEND_DIR) && npm start
+
+kill-ports: ## Kill processes using required ports
+	@echo "Killing processes on application ports..."
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		lsof -ti :3000 | xargs kill -9 2>/dev/null || true; \
+	else \
+		fuser -k 3000/tcp 2>/dev/null || true; \
+	fi
+	@echo "   ✓ Frontend 3000 killed"
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		lsof -ti :8888 | xargs kill -9 2>/dev/null || true; \
+	else \
+		fuser -k 8888/tcp 2>/dev/null || true; \
+	fi
+	@echo "   ✓ Backend 8888 killed"
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		lsof -ti :8080 | xargs kill -9 2>/dev/null || true; \
+	else \
+		fuser -k 8080/tcp 2>/dev/null || true; \
+	fi
+	@echo "   ✓ OVMS REST 8080 killed"
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		lsof -ti :8081 | xargs kill -9 2>/dev/null || true; \
+	else \
+		fuser -k 8081/tcp 2>/dev/null || true; \
+	fi
+	@echo "   ✓ OVMS gRPC 8081 killed"
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		lsof -ti :9000 | xargs kill -9 2>/dev/null || true; \
+	else \
+		fuser -k 9000/tcp 2>/dev/null || true; \
+	fi
+	@echo "   ✓ MinIO 9000 killed"
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		lsof -ti :9001 | xargs kill -9 2>/dev/null || true; \
+	else \
+		fuser -k 9001/tcp 2>/dev/null || true; \
+	fi
+	@echo "   ✓ MinIO Console 9001 killed"
+	@echo "All ports cleared."

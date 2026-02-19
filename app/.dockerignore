@@ -1,0 +1,44 @@
+# Virtual environments
+backend/.venv
+backend/venv
+backend/env
+backend/ENV
+backend/.env
+backend/.envrc
+
+# Python artifacts
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/*.so
+**/*.egg-info/
+**/*.egg
+
+# uv / pip
+backend/uv.lock
+backend/.python-version
+
+# IDE and editors
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+
+# OS generated files
+**/.DS_Store
+
+# Version control
+**/.git/
+**/.gitignore
+**/.gitattributes
+
+# Documentation
+**/*.md
+
+# Development files
+backend/.dockerignore
+backend/.containerignore
+backend/Containerfile_asd
+backend/Dockerfile copy
+backend/deploy_to_openshift.py
+backend/pyproject.toml
