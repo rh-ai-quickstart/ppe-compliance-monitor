@@ -1,33 +1,9 @@
 import cv2
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
-from ultralytics import YOLO
+
+# from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+# import torch
+from runtime import Runtime
 from collections import defaultdict
-import os
-import tempfile
-from minio_client import download_file, is_minio_enabled
-
-
-def get_model_path():
-    """
-    Get model path, downloading from MinIO if enabled.
-    
-    When MINIO_ENABLED=true: Downloads model from MinIO to a temp directory.
-        - Used for local development with podman-compose
-    When MINIO_ENABLED=false: Uses MODEL_PATH environment variable.
-        - Used for Kubernetes/OpenShift where files are pre-downloaded to PVC
-    """
-    if is_minio_enabled():
-        bucket = os.getenv("MINIO_MODEL_BUCKET", "models")
-        object_name = os.getenv("MINIO_MODEL_KEY", "ppe.pt")
-        local_path = os.path.join(tempfile.gettempdir(), "minio_cache", "models", object_name)
-        return download_file(bucket, object_name, local_path)
-    else:
-        # Fallback to local files for development without MinIO
-        default_model_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "models", "ppe.pt")
-        )
-        return os.getenv("MODEL_PATH", default_model_path)
 
 
 class MultiModalAIDemo:
@@ -37,7 +13,7 @@ class MultiModalAIDemo:
         """Initialize the demo with a local video path."""
         self.video_path = video_path
         self.cap = None
-        self.anomaly_detector = None
+        self.runtime = None
         self.summarizer = None
         self.description_buffer = []
         self.frame_count = 0
@@ -60,20 +36,21 @@ class MultiModalAIDemo:
     def setup_components(self):
         """Load models and initialize runtime components."""
         self.cap = cv2.VideoCapture(self.video_path)
-        model_path = get_model_path()
-        self.anomaly_detector = YOLO(model_path)
-        print("Model classes:", self.anomaly_detector.names)
-        self.class_names = list(self.anomaly_detector.names.values())
+        self.runtime = Runtime()
+        print("Model classes:", self.runtime.CLASSES)
+        self.class_names = list(self.runtime.CLASSES.values())
         print("Using class names:", self.class_names)
 
-        model_name = "google/flan-t5-base"
-        self.summarizer_tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.summarizer_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        # model_name = "google/flan-t5-base"
+        # self.summarizer_tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # self.summarizer_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.summarizer_model.to(self.device)
+        # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # self.summarizer_model.to(self.device)
 
-    def format_detection_description(self, detections):
+    def format_detection_description(
+        self, detections_class_count: dict[str, int]
+    ) -> str:
         """Build a short, human-readable description from detection counts."""
         description = "Detected: "
         for item in [
@@ -85,8 +62,8 @@ class MultiModalAIDemo:
             "NO-Safety Vest",
             "NO-Mask",
         ]:
-            if detections[item] > 0:
-                description += f"{item}: {detections[item]}, "
+            if detections_class_count[item] > 0:
+                description += f"{item}: {detections_class_count[item]}, "
 
         return description.rstrip(", ")
 
@@ -98,17 +75,13 @@ class MultiModalAIDemo:
 
     def generate_image_description(self, frame):
         """Run detection on a frame and return a short description string."""
-        results = self.anomaly_detector(frame, stream=True)
-        detections = defaultdict(int)
+        detections = self.runtime.run(frame)
+        detections_class_count = defaultdict(int)
 
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                cls = int(box.cls[0])
-                currentClass = self.class_names[cls]
-                detections[currentClass] += 1
+        for d in detections:
+            detections_class_count[d.class_name] += 1
 
-        description = self.format_detection_description(detections)
+        description = self.format_detection_description(detections_class_count)
         self.append_description(description)
         return description
 
@@ -202,23 +175,22 @@ class MultiModalAIDemo:
 
         detections = []
         counts = defaultdict(int)
-        results = self.anomaly_detector(frame, stream=True)
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                conf = float(box.conf[0])
-                cls = int(box.cls[0])
-                class_name = self.class_names[cls]
-                counts[class_name] += 1
-                detections.append(
-                    {
-                        "bbox": (x1, y1, x2, y2),
-                        "confidence": conf,
-                        "class_id": cls,
-                        "class_name": class_name,
-                    }
-                )
+        runtime_detections = self.runtime.run(frame)
+        for d in runtime_detections:
+            counts[d.class_name] += 1
+            x, y, w, h = d.bbox
+            x1 = round(x * d.scale)
+            y1 = round(y * d.scale)
+            x2 = round((x + w) * d.scale)
+            y2 = round((y + h) * d.scale)
+            detections.append(
+                {
+                    "bbox": (x1, y1, x2, y2),
+                    "confidence": d.confidence,
+                    "class_id": d.class_id,
+                    "class_name": d.class_name,
+                }
+            )
 
         self.latest_detection = counts
         description = self.format_detection_description(counts)

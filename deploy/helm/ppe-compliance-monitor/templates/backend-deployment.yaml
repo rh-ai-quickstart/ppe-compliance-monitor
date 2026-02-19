@@ -106,6 +106,16 @@ spec:
               value: "/data/models/{{ .Values.storage.model.key }}"
             - name: VIDEO_PATH
               value: "/data/video/{{ .Values.storage.video.key }}"
+            - name: SERVICE_URL
+              value: {{ .Values.backend.serviceUrl | quote }}
+            - name: MODEL_INPUT_NAME
+              value: {{ .Values.backend.modelInputName | quote }}
+            - name: MODEL_NAME
+              value: {{ .Values.backend.modelName | quote }}
+            - name: MODEL_VERSION
+              value: {{ .Values.backend.modelVersion | quote }}
+            - name: OPENSHIFT
+              value: "true"
           volumeMounts:
             - name: data-volume
               mountPath: /data
