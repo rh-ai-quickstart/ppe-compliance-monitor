@@ -3,9 +3,13 @@ backend:
   port: 8888
   corsOrigins: ""
   image:
-    repository: quay.io/rh-ai-quickstart/ppe-compliance-monitor-backend
-    tag: latest
+    repository: quay.io/ikatav/ppe
+    tag: itay
     pullPolicy: Always
+  serviceUrl: "http://ppe-predictor.ppe-itay.svc.cluster.local"
+  modelInputName: "x"
+  modelName: "ppe"
+  modelVersion: "1"
 
 frontend:
   replicas: 1
@@ -54,6 +58,39 @@ data:
     repository: quay.io/rh-ai-quickstart/ppe-compliance-monitor-data
     tag: latest
     pullPolicy: Always
+
+runtimeDeployer:
+  enabled: true
+  image:
+    repository: quay.io/ikatav/ppe
+    tag: runtime
+    pullPolicy: Always
+  scc:
+    enabled: true
+
+modelServing:
+  enabled: true
+  name: "" # Defaults to Release.Namespace + "-deploy"
+  modelFormat:
+    name: pytorch
+    version: "2"
+  modelPath: ppe.pt
+  deploymentMode: RawDeployment
+  auth: false
+  replicas:
+    min: 1
+    max: 1
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  runtime:
+    image: "registry.redhat.io/rhoai/odh-openvino-model-server-rhel9@sha256:7daebf4a4205b9b81293932a1dfec705f59a83de8097e468e875088996c1f224"
+    restPort: 8888
+    grpcPort: 8001
 
 openshift:
   sharedHost: ""
