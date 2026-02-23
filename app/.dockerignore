@@ -38,7 +38,3 @@ backend/.python-version
 # Development files
 backend/.dockerignore
 backend/.containerignore
-backend/Containerfile_asd
-backend/Dockerfile copy
-backend/deploy_to_openshift.py
-backend/pyproject.toml
