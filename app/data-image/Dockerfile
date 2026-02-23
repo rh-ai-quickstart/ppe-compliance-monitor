@@ -19,7 +19,18 @@ RUN cd data && 7z x combined-video-no-gap-rooftop.mp4.7z.001
 # Copy the existing ppe.pt model (not compressed)
 COPY models/ppe.pt ./models/
 
-# Stage 2: Create uploader image with mc CLI
+# Stage 2: Export model to OpenVINO format
+FROM ultralytics/ultralytics:latest-cpu AS exporter
+
+COPY --from=extractor /extract/models/ppe.pt /tmp/ppe.pt
+
+RUN pip install git+https://github.com/openai/CLIP.git && \
+    yolo export model=/tmp/ppe.pt format=openvino task=detect && \
+    mkdir -p /exported/ppe/1 && \
+    cp /tmp/ppe_openvino_model/*.xml /exported/ppe/1/ppe.xml && \
+    cp /tmp/ppe_openvino_model/*.bin /exported/ppe/1/ppe.bin
+
+# Stage 3: Create uploader image with mc CLI
 FROM docker.io/minio/mc:latest
 
 WORKDIR /upload
@@ -28,6 +39,9 @@ WORKDIR /upload
 COPY --from=extractor /extract/data/combined-video-no-gap-rooftop.mp4 /upload/data/
 COPY --from=extractor /extract/models/custome_ppe.pt /upload/models/
 COPY --from=extractor /extract/models/ppe.pt /upload/models/
+
+# Copy exported OpenVINO model
+COPY --from=exporter /exported/ppe/1/ /upload/models/ppe/1/
 
 # Copy upload script
 COPY data-image/upload.sh /upload/upload.sh
