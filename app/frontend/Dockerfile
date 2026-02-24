@@ -10,6 +10,7 @@ USER 1001
 COPY . .
 
 ENV DISABLE_ESLINT_PLUGIN=true
+ENV NPM_CONFIG_CACHE=/tmp/.npm
 RUN npm run build
 
 USER 0

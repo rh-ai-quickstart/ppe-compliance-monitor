@@ -27,6 +27,27 @@ services:
     volumes:
       - minio_data:/data
 
+  # PostgreSQL database for tracking data persistence
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    container_name: postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ppe_tracking
+      POSTGRES_USER: ppe_user
+      POSTGRES_PASSWORD: ppe_password
+    networks:
+      - ppe
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ppe_user -d ppe_tracking"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   # Init service: uploads model and video files to MinIO (idempotent)
   data-loader:
     build:
@@ -54,6 +75,8 @@ services:
         condition: service_completed_successfully
       minio:
         condition: service_healthy
+      postgresql:
+        condition: service_healthy
     environment:
       CORS_ORIGINS: "http://localhost:3000,http://0.0.0.0:3000,http://127.0.0.1:3000"
       # MinIO configuration
@@ -74,6 +97,12 @@ services:
       MODEL_INPUT_NAME: "x"
       MODEL_NAME: "ppe"
       MODEL_VERSION: "1"
+      # PostgreSQL database connection
+      DB_HOST: postgresql
+      DB_PORT: "5432"
+      DB_NAME: ppe_tracking
+      DB_USER: ppe_user
+      DB_PASSWORD: ppe_password
     ports:
       - "8888:8888"
     networks:
@@ -152,4 +181,5 @@ services:
 
 volumes:
   minio_data:
+  postgres_data:
   model_repo:

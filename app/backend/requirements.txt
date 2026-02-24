@@ -6,3 +6,6 @@ transformers
 minio
 ovmsclient
 torch
+torchvision
+psycopg2-binary
+deep-sort-realtime
