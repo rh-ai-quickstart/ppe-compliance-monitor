@@ -20,16 +20,6 @@ mc mb --ignore-existing myminio/models
 mc mb --ignore-existing myminio/data
 echo "Buckets ready"
 
-# Upload model (only if not exists)
-echo "Checking model file..."
-if ! mc stat myminio/models/ppe.pt >/dev/null 2>&1; then
-	echo "Uploading model (ppe.pt)..."
-	mc cp /upload/models/ppe.pt myminio/models/
-	echo "Model uploaded successfully"
-else
-	echo "Model already exists, skipping"
-fi
-
 # Upload OpenVINO model (only if not exists)
 echo "Checking OpenVINO model files..."
 if ! mc stat myminio/models/ppe/1/ppe.xml >/dev/null 2>&1; then
