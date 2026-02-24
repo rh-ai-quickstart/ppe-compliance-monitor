@@ -6,7 +6,7 @@ backend:
     repository: quay.io/ikatav/ppe
     tag: itay
     pullPolicy: Always
-  serviceUrl: "http://ppe-predictor.ppe-itay.svc.cluster.local"
+  serviceUrl: "http://ppe-predictor.svc.cluster.local:8888"
   modelInputName: "x"
   modelName: "ppe"
   modelVersion: "1"
@@ -62,11 +62,11 @@ data:
 runtimeDeployer:
   enabled: true
   image:
-    repository: quay.io/ikatav/ppe
-    tag: runtime
+    repository: quay.io/rh-ai-quickstart/ppe-compliance-monitor-runtime
+    tag: latest
     pullPolicy: Always
   scc:
-    enabled: true
+    enabled: false
 
 modelServing:
   enabled: true
@@ -74,7 +74,7 @@ modelServing:
   modelFormat:
     name: pytorch
     version: "2"
-  modelPath: ppe.pt
+  modelPath: ppe
   deploymentMode: RawDeployment
   auth: false
   replicas:
@@ -85,8 +85,8 @@ modelServing:
       cpu: "2"
       memory: 4Gi
     limits:
-      cpu: "2"
-      memory: 4Gi
+      cpu: "4"
+      memory: 8Gi
   runtime:
     image: "registry.redhat.io/rhoai/odh-openvino-model-server-rhel9@sha256:7daebf4a4205b9b81293932a1dfec705f59a83de8097e468e875088996c1f224"
     restPort: 8888

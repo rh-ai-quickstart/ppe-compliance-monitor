@@ -18,75 +18,6 @@ spec:
         {{- include "ppe-compliance-monitor.labels" . | nindent 8 }}
         app.kubernetes.io/component: backend
     spec:
-      initContainers:
-        # Upload data to MinIO (idempotent - skips if already exists)
-        - name: upload-data
-          image: "{{ .Values.data.image.repository }}:{{ .Values.data.image.tag }}"
-          imagePullPolicy: {{ .Values.data.image.pullPolicy }}
-          env:
-            - name: MINIO_ENDPOINT
-              value: "http://{{ .Values.minio.secret.host }}:{{ .Values.minio.secret.port }}"
-            - name: MINIO_ACCESS_KEY
-              value: {{ .Values.minio.secret.user | quote }}
-            - name: MINIO_SECRET_KEY
-              value: {{ .Values.minio.secret.password | quote }}
-        # Download model and video from MinIO to PVC
-        - name: download-data
-          image: docker.io/minio/mc:latest
-          command:
-            - /bin/sh
-            - -c
-            - |
-              set -e
-              export MC_CONFIG_DIR=/tmp/.mc
-              
-              echo "=== Downloading data from MinIO to PVC ==="
-              
-              # Configure mc client
-              mc alias set myminio http://${MINIO_ENDPOINT} ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}
-              
-              # Wait for MinIO to be ready
-              echo "Waiting for MinIO..."
-              until mc ls myminio > /dev/null 2>&1; do
-                echo "MinIO not ready, retrying..."
-                sleep 2
-              done
-              echo "MinIO connection established"
-              
-              # Create directories
-              mkdir -p /data/models /data/video
-              
-              # Download model (skip if already exists and same size)
-              if [ ! -f /data/models/{{ .Values.storage.model.key }} ]; then
-                echo "Downloading model..."
-                mc cp myminio/{{ .Values.storage.model.bucket }}/{{ .Values.storage.model.key }} /data/models/
-                echo "Model downloaded"
-              else
-                echo "Model already exists, skipping download"
-              fi
-              
-              # Download video (skip if already exists)
-              if [ ! -f /data/video/{{ .Values.storage.video.key }} ]; then
-                echo "Downloading video..."
-                mc cp myminio/{{ .Values.storage.video.bucket }}/{{ .Values.storage.video.key }} /data/video/
-                echo "Video downloaded"
-              else
-                echo "Video already exists, skipping download"
-              fi
-              
-              echo "=== Download complete ==="
-              ls -la /data/models/
-              ls -la /data/video/
-          env:
-            - name: MINIO_ENDPOINT
-              value: "{{ .Values.minio.secret.host }}:{{ .Values.minio.secret.port }}"
-            - name: MINIO_ACCESS_KEY
-              value: {{ .Values.minio.secret.user | quote }}
-            - name: MINIO_SECRET_KEY
-              value: {{ .Values.minio.secret.password | quote }}
-          volumeMounts:
-            - name: data-volume
-              mountPath: /data
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
@@ -98,16 +29,14 @@ spec:
           env:
             - name: CORS_ORIGINS
               value: {{ default (printf "http://%s-frontend:%d" (include "ppe-compliance-monitor.fullname" .) .Values.frontend.port) .Values.backend.corsOrigins | quote }}
-            # Disable MinIO download in backend - files are pre-downloaded to PVC
             - name: MINIO_ENABLED
-              value: "false"
-            # Use files from the PVC mount
+              value: "true"
             - name: MODEL_PATH
               value: "/data/models/{{ .Values.storage.model.key }}"
             - name: VIDEO_PATH
               value: "/data/video/{{ .Values.storage.video.key }}"
             - name: SERVICE_URL
-              value: {{ .Values.backend.serviceUrl | quote }}
+              value: "http://ppe-predictor.{{ .Release.Namespace }}.svc.cluster.local:8888"
             - name: MODEL_INPUT_NAME
               value: {{ .Values.backend.modelInputName | quote }}
             - name: MODEL_NAME
@@ -116,11 +45,3 @@ spec:
               value: {{ .Values.backend.modelVersion | quote }}
             - name: OPENSHIFT
               value: "true"
-          volumeMounts:
-            - name: data-volume
-              mountPath: /data
-              readOnly: true
-      volumes:
-        - name: data-volume
-          persistentVolumeClaim:
-            claimName: {{ include "ppe-compliance-monitor.fullname" . }}-data

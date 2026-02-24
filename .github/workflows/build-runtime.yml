@@ -1,0 +1,29 @@
+name: Build and Push Runtime Image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/runtime/**'
+      - '.github/workflows/build-runtime.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/runtime/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      image_name: rh-ai-quickstart/ppe-compliance-monitor-runtime
+      context: ./app/runtime
+      dockerfile: ./app/runtime/Containerfile
+    secrets:
+      QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}

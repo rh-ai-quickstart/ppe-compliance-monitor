@@ -1,0 +1,257 @@
+{{- if .Values.runtimeDeployer.enabled }}
+{{- $fullName := include "ppe-compliance-monitor.fullname" . }}
+{{- $saName := printf "%s-runtime-deployer" $fullName }}
+#
+# ──────────────────────────────────────────────
+# 1. SecurityContextConstraints
+# ──────────────────────────────────────────────
+
+{{- if .Values.runtimeDeployer.scc.enabled }}
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: {{ $saName }}-scc
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runtime-deployer
+allowPrivilegeEscalation: false
+runAsUser:
+  type: MustRunAsRange
+seLinuxContext:
+  type: MustRunAs
+fsGroup:
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - projected
+  - secret
+users:
+  - system:serviceaccount:{{ .Release.Namespace }}:{{ $saName }}
+{{- end }}
+
+---
+# ──────────────────────────────────────────────
+# 2. ServiceAccount
+# ──────────────────────────────────────────────
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $saName }}
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runtime-deployer
+
+---
+# ──────────────────────────────────────────────
+# 3. Role  –  permissions for create_runtime.py
+# ──────────────────────────────────────────────
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $saName }}
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runtime-deployer
+rules:
+  - apiGroups: [""]
+    resources: ["secrets", "serviceaccounts"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  - apiGroups: ["serving.kserve.io"]
+    resources: ["servingruntimes", "inferenceservices"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+
+---
+# ──────────────────────────────────────────────
+# 4. RoleBinding
+# ──────────────────────────────────────────────
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $saName }}
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runtime-deployer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $saName }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $saName }}
+    namespace: {{ .Release.Namespace }}
+
+{{- if .Values.runtimeDeployer.scc.enabled }}
+---
+# ──────────────────────────────────────────────
+# 5. RoleBinding  –  SCC
+# ──────────────────────────────────────────────
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $saName }}-scc
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runtime-deployer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:{{ $saName }}-scc
+subjects:
+  - kind: ServiceAccount
+    name: {{ $saName }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+
+---
+# ──────────────────────────────────────────────
+# 6. Job  –  runs create_runtime.py
+# ──────────────────────────────────────────────
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $saName }}
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runtime-deployer
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded,hook-failed
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "ppe-compliance-monitor.labels" . | nindent 8 }}
+        app.kubernetes.io/component: runtime-deployer
+    spec:
+      serviceAccountName: {{ $saName }}
+      restartPolicy: OnFailure
+      containers:
+        - name: runtime-deployer
+          image: "{{ .Values.runtimeDeployer.image.repository }}:{{ .Values.runtimeDeployer.image.tag }}"
+          imagePullPolicy: {{ .Values.runtimeDeployer.image.pullPolicy }}
+          env:
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}
+            - name: DEPLOY_MODEL
+              value: "true"
+            - name: S3_BUCKET
+              value: {{ index .Values.minio.bucketCreation.buckets 0 | quote }}
+            - name: S3_MODEL_PATH
+              value: {{ .Values.modelServing.modelPath | quote }}
+            - name: MINIO_ENDPOINT
+              value: "http://{{ .Values.minio.secret.host }}:{{ .Values.minio.secret.port }}"
+            - name: MINIO_ACCESS_KEY
+              value: {{ .Values.minio.secret.user | quote }}
+            - name: MINIO_SECRET_KEY
+              value: {{ .Values.minio.secret.password | quote }}
+            - name: MODEL_NAME
+              value: {{ .Values.backend.modelName | quote }}
+            - name: MODEL_VERSION
+              value: {{ .Values.backend.modelVersion | quote }}
+            - name: MODEL_FORMAT
+              value: {{ .Values.modelServing.modelFormat.name | quote }}
+            - name: MODEL_FORMAT_VERSION
+              value: {{ .Values.modelServing.modelFormat.version | quote }}
+            - name: SERVING_RUNTIME_IMAGE
+              value: {{ .Values.modelServing.runtime.image | quote }}
+            - name: REST_PORT
+              value: {{ .Values.modelServing.runtime.restPort | quote }}
+            - name: GRPC_PORT
+              value: {{ .Values.modelServing.runtime.grpcPort | quote }}
+            - name: CREATE_SERVING_RUNTIME
+              value: "true"
+            - name: REPLICAS_MIN
+              value: {{ .Values.modelServing.replicas.min | quote }}
+            - name: REPLICAS_MAX
+              value: {{ .Values.modelServing.replicas.max | quote }}
+            - name: RESOURCE_REQ_CPU
+              value: {{ .Values.modelServing.resources.requests.cpu | quote }}
+            - name: RESOURCE_REQ_MEMORY
+              value: {{ .Values.modelServing.resources.requests.memory | quote }}
+            - name: RESOURCE_LIM_CPU
+              value: {{ .Values.modelServing.resources.limits.cpu | quote }}
+            - name: RESOURCE_LIM_MEMORY
+              value: {{ .Values.modelServing.resources.limits.memory | quote }}
+{{/*
+
+---
+# ──────────────────────────────────────────────
+# 6b. Deployment  –  debug pod for create_runtime.py
+# ──────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $saName }}-debug
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runtime-deployer-debug
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: runtime-deployer-debug
+  template:
+    metadata:
+      labels:
+        {{- include "ppe-compliance-monitor.labels" . | nindent 8 }}
+        app.kubernetes.io/component: runtime-deployer-debug
+    spec:
+      serviceAccountName: {{ $saName }}
+      containers:
+        - name: runtime-deployer
+          image: "{{ .Values.runtimeDeployer.image.repository }}:{{ .Values.runtimeDeployer.image.tag }}"
+          imagePullPolicy: {{ .Values.runtimeDeployer.image.pullPolicy }}
+          command: ["sleep", "infinity"]
+          env:
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}
+            - name: DEPLOY_MODEL
+              value: "true"
+            - name: S3_BUCKET
+              value: {{ index .Values.minio.bucketCreation.buckets 0 | quote }}
+            - name: S3_MODEL_PATH
+              value: {{ .Values.modelServing.modelPath | quote }}
+            - name: MINIO_ENDPOINT
+              value: "http://{{ .Values.minio.secret.host }}:{{ .Values.minio.secret.port }}"
+            - name: MINIO_ACCESS_KEY
+              value: {{ .Values.minio.secret.user | quote }}
+            - name: MINIO_SECRET_KEY
+              value: {{ .Values.minio.secret.password | quote }}
+            - name: MODEL_NAME
+              value: {{ .Values.backend.modelName | quote }}
+            - name: MODEL_VERSION
+              value: {{ .Values.backend.modelVersion | quote }}
+            - name: MODEL_FORMAT
+              value: {{ .Values.modelServing.modelFormat.name | quote }}
+            - name: MODEL_FORMAT_VERSION
+              value: {{ .Values.modelServing.modelFormat.version | quote }}
+            - name: SERVING_RUNTIME_IMAGE
+              value: {{ .Values.modelServing.runtime.image | quote }}
+            - name: REST_PORT
+              value: {{ .Values.modelServing.runtime.restPort | quote }}
+            - name: GRPC_PORT
+              value: {{ .Values.modelServing.runtime.grpcPort | quote }}
+            - name: CREATE_SERVING_RUNTIME
+              value: "true"
+            - name: REPLICAS_MIN
+              value: {{ .Values.modelServing.replicas.min | quote }}
+            - name: REPLICAS_MAX
+              value: {{ .Values.modelServing.replicas.max | quote }}
+            - name: RESOURCE_REQ_CPU
+              value: {{ .Values.modelServing.resources.requests.cpu | quote }}
+            - name: RESOURCE_REQ_MEMORY
+              value: {{ .Values.modelServing.resources.requests.memory | quote }}
+            - name: RESOURCE_LIM_CPU
+              value: {{ .Values.modelServing.resources.limits.cpu | quote }}
+            - name: RESOURCE_LIM_MEMORY
+              value: {{ .Values.modelServing.resources.limits.memory | quote }}
+
+*/}}
+
+{{- end }}

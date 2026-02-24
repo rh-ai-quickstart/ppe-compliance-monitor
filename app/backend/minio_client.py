@@ -21,7 +21,13 @@ def get_minio_client():
     )
 
 
-def download_file(bucket: str, object_name: str, local_path: str, max_retries: int = 5, retry_delay: int = 3) -> str:
+def download_file(
+    bucket: str,
+    object_name: str,
+    local_path: str,
+    max_retries: int = 5,
+    retry_delay: int = 3,
+) -> str:
     """
     Download a file from MinIO to a local path.
 
@@ -45,7 +51,9 @@ def download_file(bucket: str, object_name: str, local_path: str, max_retries: i
 
     for attempt in range(max_retries):
         try:
-            print(f"Downloading {bucket}/{object_name} to {local_path} (attempt {attempt + 1}/{max_retries})")
+            print(
+                f"Downloading {bucket}/{object_name} to {local_path} (attempt {attempt + 1}/{max_retries})"
+            )
             client.fget_object(bucket, object_name, local_path)
             print(f"Successfully downloaded {bucket}/{object_name}")
             return local_path
@@ -61,14 +69,13 @@ def download_file(bucket: str, object_name: str, local_path: str, max_retries: i
 def is_minio_enabled() -> bool:
     """
     Check if MinIO is enabled via environment variable.
-    
+
     When MINIO_ENABLED=true:
     - Downloads files from MinIO to temp directory at runtime
     - Used for local development with podman-compose
-    
+
     When MINIO_ENABLED=false (default):
     - Uses MODEL_PATH and VIDEO_PATH environment variables
     - Used for Kubernetes/OpenShift where init container pre-downloads files to PVC
     """
     return os.getenv("MINIO_ENABLED", "false").lower() == "true"
-

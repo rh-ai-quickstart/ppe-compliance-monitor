@@ -1,0 +1,31 @@
+FROM registry.access.redhat.com/ubi8/python-312
+
+USER root
+
+# Install uv pointing to the uv image and coping from there
+# /uv and /uvx are the source files copied from the uv image
+# /bin is the destination
+COPY --from=ghcr.io/astral-sh/uv:0.9.7 /uv /uvx /bin/
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies
+RUN uv sync --no-dev --locked
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
+
+ENV HF_HOME=/hf_cache
+
+RUN  mkdir -p /hf_cache && \
+    chmod -R 777 /hf_cache && \
+    chmod -R +r .
+
+# Copy source code
+COPY create_runtime.py .
+
+# Default command (can be overridden in docker-compose)
+ENTRYPOINT ["python", "create_runtime.py"] 
