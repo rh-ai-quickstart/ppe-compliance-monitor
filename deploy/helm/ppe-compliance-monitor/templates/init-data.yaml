@@ -1,0 +1,34 @@
+{{- if .Values.storage.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ppe-compliance-monitor.fullname" . }}-init-data-model
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: init-data-model
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-20"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "ppe-compliance-monitor.labels" . | nindent 8 }}
+        app.kubernetes.io/component: init-data-model
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init-data-and-model
+          image: "{{ .Values.data.image.repository }}:{{ .Values.data.image.tag }}"
+          imagePullPolicy: {{ .Values.data.image.pullPolicy }}
+          env:
+            - name: MINIO_ENDPOINT
+              value: "http://{{ .Values.minio.secret.host }}:{{ .Values.minio.secret.port }}"
+            - name: MINIO_ACCESS_KEY
+              value: {{ .Values.minio.secret.user | quote }}
+            - name: MINIO_SECRET_KEY
+              value: {{ .Values.minio.secret.password | quote }}
+{{- end }}

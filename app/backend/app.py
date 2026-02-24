@@ -40,18 +40,10 @@ def get_video_path():
         local_path = os.path.join(
             tempfile.gettempdir(), "minio_cache", "video", object_name
         )
+        print(f"Downloading video from MinIO to {local_path}")
         return download_file(bucket, object_name, local_path)
     else:
-        # Fallback to local files for development without MinIO
-        default_video_path = os.path.abspath(
-            os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "data",
-                "combined-video-no-gap-rooftop.mp4",
-            )
-        )
-        return os.getenv("VIDEO_PATH", default_video_path)
+        raise ValueError("MinIO is not enabled")
 
 
 video_path = get_video_path()
