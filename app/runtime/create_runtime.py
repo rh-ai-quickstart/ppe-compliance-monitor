@@ -272,6 +272,37 @@ def create_service_account(core_v1, cfg):
     return sa_name
 
 
+# def _parse_cpu_value(cpu_str):
+#     """Parse Kubernetes CPU string to integer core count."""
+#     if cpu_str.endswith("m"):
+#         return max(1, int(cpu_str[:-1]) // 1000)
+#     return int(cpu_str)
+
+
+def _build_ovms_args(cfg):
+    """Build OVMS container args optimized for low-concurrency REST inference."""
+    # num_cpus = _parse_cpu_value(cfg["resources"]["limits"]["cpu"])
+    plugin_config = json.dumps(
+        {
+            "PERFORMANCE_HINT": "THROUGHPUT",
+        }
+    )
+    return [
+        "--model_name={{.Name}}",
+        f"--port={cfg['grpc_port']}",
+        f"--rest_port={cfg['rest_port']}",
+        "--model_path=/mnt/models",
+        "--file_system_poll_wait_seconds=0",
+        "--metrics_enable",
+        "--nireq=2",
+        "--rest_workers=2",
+        "--rest_bind_address=0.0.0.0",
+        "--cache_dir=/tmp/ovms_cache",
+        f"--plugin_config={plugin_config}",
+        # f"--rest_workers={max(num_cpus, 4)}",
+    ]
+
+
 def build_serving_runtime_spec(cfg):
     """Build the OVMS ServingRuntime specification.
 
@@ -306,14 +337,7 @@ def build_serving_runtime_spec(cfg):
                 {
                     "name": "kserve-container",
                     "image": cfg["runtime_image"],
-                    "args": [
-                        "--model_name={{.Name}}",
-                        f"--port={cfg['grpc_port']}",
-                        f"--rest_port={cfg['rest_port']}",
-                        "--model_path=/mnt/models",
-                        "--file_system_poll_wait_seconds=0",
-                        "--metrics_enable",
-                    ],
+                    "args": _build_ovms_args(cfg),
                     "ports": [
                         {
                             "containerPort": cfg["rest_port"],

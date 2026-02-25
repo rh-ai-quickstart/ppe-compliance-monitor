@@ -86,7 +86,7 @@ modelServing:
       memory: 4Gi
     limits:
       cpu: "4"
-      memory: 8Gi
+      memory: 4Gi
   runtime:
     image: "registry.redhat.io/rhoai/odh-openvino-model-server-rhel9@sha256:7daebf4a4205b9b81293932a1dfec705f59a83de8097e468e875088996c1f224"
     restPort: 8888
