@@ -4,6 +4,10 @@ import os
 import time
 from minio import Minio
 from minio.error import S3Error
+from urllib.parse import urlparse
+from logger import get_logger
+
+log = get_logger(__name__)
 
 
 def get_minio_client():
@@ -12,6 +16,12 @@ def get_minio_client():
     access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
     secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
     secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
+    # Minio() expects bare host:port; strip scheme if a full URL was provided
+    parsed = urlparse(endpoint)
+    if parsed.scheme in ("http", "https"):
+        endpoint = parsed.netloc or parsed.path
+        if parsed.scheme == "https":
+            secure = True
 
     return Minio(
         endpoint,
@@ -51,31 +61,18 @@ def download_file(
 
     for attempt in range(max_retries):
         try:
-            print(
+            log.info(
                 f"Downloading {bucket}/{object_name} to {local_path} (attempt {attempt + 1}/{max_retries})"
             )
             client.fget_object(bucket, object_name, local_path)
-            print(f"Successfully downloaded {bucket}/{object_name}")
+            log.info(f"Successfully downloaded {bucket}/{object_name}")
             return local_path
         except S3Error as e:
             if attempt < max_retries - 1:
-                print(f"Download failed: {e}. Retrying in {retry_delay} seconds...")
+                log.warning(
+                    f"Download failed: {e}. Retrying in {retry_delay} seconds..."
+                )
                 time.sleep(retry_delay)
             else:
-                print(f"Download failed after {max_retries} attempts: {e}")
+                log.error(f"Download failed after {max_retries} attempts: {e}")
                 raise
-
-
-def is_minio_enabled() -> bool:
-    """
-    Check if MinIO is enabled via environment variable.
-
-    When MINIO_ENABLED=true:
-    - Downloads files from MinIO to temp directory at runtime
-    - Used for local development with podman-compose
-
-    When MINIO_ENABLED=false (default):
-    - Uses MODEL_PATH and VIDEO_PATH environment variables
-    - Used for Kubernetes/OpenShift where init container pre-downloads files to PVC
-    """
-    return os.getenv("MINIO_ENABLED", "false").lower() == "true"

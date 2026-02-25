@@ -4,6 +4,9 @@ import cv2
 # import torch
 from runtime import Runtime
 from collections import defaultdict
+from logger import get_logger
+
+log = get_logger(__name__)
 
 
 class MultiModalAIDemo:
@@ -37,9 +40,9 @@ class MultiModalAIDemo:
         """Load models and initialize runtime components."""
         self.cap = cv2.VideoCapture(self.video_path)
         self.runtime = Runtime()
-        print("Model classes:", self.runtime.CLASSES)
+        log.info(f"Model classes: {self.runtime.CLASSES}")
         self.class_names = list(self.runtime.CLASSES.values())
-        print("Using class names:", self.class_names)
+        log.info(f"Using class names: {self.class_names}")
 
         # model_name = "google/flan-t5-base"
         # self.summarizer_tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -79,6 +82,8 @@ class MultiModalAIDemo:
         detections_class_count = defaultdict(int)
 
         for d in detections:
+            if d.class_name in ["Safety Cone", "Safety Vest", "machinery", "vehicle"]:
+                continue
             detections_class_count[d.class_name] += 1
 
         description = self.format_detection_description(detections_class_count)
@@ -167,6 +172,7 @@ class MultiModalAIDemo:
         """Capture a frame, optionally resize, update detection state, and return frame data."""
         success, frame = self.cap.read()
         if not success:
+            log.debug("End of video reached, looping back to start")
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             return None, []
 
@@ -177,6 +183,8 @@ class MultiModalAIDemo:
         counts = defaultdict(int)
         runtime_detections = self.runtime.run(frame)
         for d in runtime_detections:
+            if d.class_name in ["Safety Cone", "Safety Vest", "machinery", "vehicle"]:
+                continue
             counts[d.class_name] += 1
             x, y, w, h = d.bbox
             x1 = round(x * d.scale)

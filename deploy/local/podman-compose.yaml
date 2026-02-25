@@ -52,11 +52,12 @@ services:
     depends_on:
       data-loader:
         condition: service_completed_successfully
+      minio:
+        condition: service_healthy
     environment:
       CORS_ORIGINS: "http://localhost:3000,http://0.0.0.0:3000,http://127.0.0.1:3000"
       # MinIO configuration
-      MINIO_ENABLED: "true"
-      MINIO_ENDPOINT: minio:9000
+      MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_SECURE: "false"

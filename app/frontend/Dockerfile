@@ -4,7 +4,7 @@ WORKDIR /app
 
 USER 0
 COPY package*.json ./
-RUN npm install && chown -R 1001:0 /app
+RUN npm install && chown -R 1001:0 /app /opt/app-root/src/.npm
 USER 1001
 
 COPY . .

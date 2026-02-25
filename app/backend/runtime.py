@@ -1,10 +1,14 @@
 import numpy as np
 import cv2
 import os
+import time
 
 # import matplotlib.pyplot as plt
 from ovmsclient import make_grpc_client, make_http_client
 from pydantic import BaseModel
+from logger import get_logger
+
+log = get_logger(__name__)
 
 
 class Detection(BaseModel):
@@ -21,7 +25,6 @@ class Runtime:
         self.input_name = os.getenv("MODEL_INPUT_NAME")
         self.model_name = os.getenv("MODEL_NAME")
         self.model_version = int(os.getenv("MODEL_VERSION"))
-        # Choose the inference function based on the environment
         openshift_mode = os.getenv("OPENSHIFT", "false").lower() == "true"
         self.inference_fun = (
             self.remote_inference if openshift_mode else self.local_inference
@@ -172,6 +175,18 @@ class Runtime:
         """
         Run the inference for the image.
         """
+        t0 = time.perf_counter()
         blob, scale = self.preprocess_image(image)
+        t1 = time.perf_counter()
         outputs = self.inference(blob)
-        return self.postprocess_image(outputs, image, scale)
+        t2 = time.perf_counter()
+        detections = self.postprocess_image(outputs, image, scale)
+        t3 = time.perf_counter()
+
+        log.debug(
+            f"Inference timing — preprocess: {(t1 - t0) * 1000:.1f}ms, "
+            f"inference: {(t2 - t1) * 1000:.1f}ms, "
+            f"postprocess: {(t3 - t2) * 1000:.1f}ms, "
+            f"total: {(t3 - t0) * 1000:.1f}ms"
+        )
+        return detections
