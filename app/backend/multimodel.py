@@ -79,6 +79,8 @@ class MultiModalAIDemo:
         detections_class_count = defaultdict(int)
 
         for d in detections:
+            if d.class_name in ["Safety Cone", "Safety Vest", "machinery", "vehicle"]:
+                continue
             detections_class_count[d.class_name] += 1
 
         description = self.format_detection_description(detections_class_count)
@@ -177,6 +179,8 @@ class MultiModalAIDemo:
         counts = defaultdict(int)
         runtime_detections = self.runtime.run(frame)
         for d in runtime_detections:
+            if d.class_name in ["Safety Cone", "Safety Vest", "machinery", "vehicle"]:
+                continue
             counts[d.class_name] += 1
             x, y, w, h = d.bbox
             x1 = round(x * d.scale)
