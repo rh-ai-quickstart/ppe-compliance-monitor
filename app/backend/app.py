@@ -9,6 +9,9 @@ import traceback
 import os
 import tempfile
 from minio_client import download_file
+from logger import get_logger
+
+log = get_logger(__name__)
 
 
 app = Flask(__name__)
@@ -39,20 +42,23 @@ def get_video_path():
     local_path = os.path.join(
         tempfile.gettempdir(), "minio_cache", "video", object_name
     )
-    print(f"Downloading video from MinIO to {local_path}")
+    log.info(f"Downloading video from MinIO to {local_path}")
     return download_file(bucket, object_name, local_path)
 
 
 video_path = get_video_path()
 demo = MultiModalAIDemo(video_path)
 demo.setup_components()
+log.info("MultiModalAIDemo initialized and components ready")
 
 latest_description = "Initializing..."
 latest_summary = "Processing video..."
 
+log.info("Loading QA pipeline (distilbert-base-uncased-distilled-squad)")
 qa_pipeline = pipeline(
     "question-answering", model="distilbert-base-uncased-distilled-squad"
 )
+log.info("QA pipeline loaded")
 
 
 def generate_frames():
@@ -183,9 +189,9 @@ def chat():
         response = generate_response(user_message, latest_detection, current_summary)
         return jsonify({"answer": response})
     except Exception as e:
-        print(f"Error in chat route: {str(e)}")
-        print(f"Error type: {type(e).__name__}")
-        print(f"Error traceback: {traceback.format_exc()}")
+        log.error(
+            f"Error in chat route ({type(e).__name__}): {e}\n{traceback.format_exc()}"
+        )
         return jsonify(
             {
                 "answer": f"I'm sorry, but I encountered an error while processing your request: {str(e)}"

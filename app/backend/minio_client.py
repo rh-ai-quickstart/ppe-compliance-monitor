@@ -4,8 +4,10 @@ import os
 import time
 from minio import Minio
 from minio.error import S3Error
-
 from urllib.parse import urlparse
+from logger import get_logger
+
+log = get_logger(__name__)
 
 
 def get_minio_client():
@@ -59,16 +61,18 @@ def download_file(
 
     for attempt in range(max_retries):
         try:
-            print(
+            log.info(
                 f"Downloading {bucket}/{object_name} to {local_path} (attempt {attempt + 1}/{max_retries})"
             )
             client.fget_object(bucket, object_name, local_path)
-            print(f"Successfully downloaded {bucket}/{object_name}")
+            log.info(f"Successfully downloaded {bucket}/{object_name}")
             return local_path
         except S3Error as e:
             if attempt < max_retries - 1:
-                print(f"Download failed: {e}. Retrying in {retry_delay} seconds...")
+                log.warning(
+                    f"Download failed: {e}. Retrying in {retry_delay} seconds..."
+                )
                 time.sleep(retry_delay)
             else:
-                print(f"Download failed after {max_retries} attempts: {e}")
+                log.error(f"Download failed after {max_retries} attempts: {e}")
                 raise
