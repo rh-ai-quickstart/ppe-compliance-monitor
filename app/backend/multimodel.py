@@ -1,17 +1,17 @@
 import cv2
-from datetime import datetime
 from collections import defaultdict
-from logger import get_logger
+from datetime import datetime
 
-log = get_logger(__name__)
-
-from runtime import Runtime
 from database import (
     init_database,
     insert_person,
     update_person_last_seen,
     insert_observation,
 )
+from logger import get_logger
+from runtime import Runtime
+
+log = get_logger(__name__)
 
 
 class MultiModalAIDemo:
@@ -51,7 +51,9 @@ class MultiModalAIDemo:
         self.person_last_state = {}
 
         # Throttle update_person_last_seen: only write to DB every N frames (not every frame)
-        self._last_seen_update_interval = 30  # Update last_seen in DB every ~1 sec at 30fps
+        self._last_seen_update_interval = (
+            30  # Update last_seen in DB every ~1 sec at 30fps
+        )
         self._frames_since_last_seen_update = 0
 
     def setup_components(self):
@@ -67,6 +69,7 @@ class MultiModalAIDemo:
         # using Ultralytics would duplicate inference. (2) Ultralytics tracking is bundled
         # with its detection in model.track(); it cannot accept external detections.
         from deep_sort_realtime.deepsort_tracker import DeepSort
+
         self.tracker = DeepSort(max_age=30, n_init=3)
         print("Object tracking enabled (DeepSORT)")
 
@@ -280,7 +283,9 @@ class MultiModalAIDemo:
         # Run DeepSORT to get track IDs for persons
         tracked_person_boxes = {}  # {track_id: (x1, y1, x2, y2)}
         if person_detections_for_tracker:
-            tracks = self.tracker.update_tracks(person_detections_for_tracker, frame=frame)
+            tracks = self.tracker.update_tracks(
+                person_detections_for_tracker, frame=frame
+            )
             for track in tracks:
                 if not track.is_confirmed():
                     continue
@@ -307,7 +312,9 @@ class MultiModalAIDemo:
         tracked_persons = []
         now = datetime.now()
         self._frames_since_last_seen_update += 1
-        do_last_seen_db_update = self._frames_since_last_seen_update >= self._last_seen_update_interval
+        do_last_seen_db_update = (
+            self._frames_since_last_seen_update >= self._last_seen_update_interval
+        )
 
         for track_id, person_bbox in tracked_person_boxes.items():
             # Update person history (first/last seen) - in-memory every frame
@@ -339,18 +346,24 @@ class MultiModalAIDemo:
             tracked_persons.append(tracked_person)
 
             # --- State-Change Recording ---
-            current_state = (ppe_status["hardhat"], ppe_status["vest"], ppe_status["mask"])
+            current_state = (
+                ppe_status["hardhat"],
+                ppe_status["vest"],
+                ppe_status["mask"],
+            )
             last_state = self.person_last_state.get(track_id)
 
             if last_state is None or last_state != current_state:
-                self.person_observations.append({
-                    "track_id": track_id,
-                    "timestamp": now,
-                    "hardhat": ppe_status["hardhat"],
-                    "vest": ppe_status["vest"],
-                    "mask": ppe_status["mask"],
-                    "bbox": person_bbox,
-                })
+                self.person_observations.append(
+                    {
+                        "track_id": track_id,
+                        "timestamp": now,
+                        "hardhat": ppe_status["hardhat"],
+                        "vest": ppe_status["vest"],
+                        "mask": ppe_status["mask"],
+                        "bbox": person_bbox,
+                    }
+                )
                 insert_observation(
                     track_id=track_id,
                     timestamp=now,

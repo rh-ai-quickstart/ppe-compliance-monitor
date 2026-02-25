@@ -43,6 +43,7 @@ def init_database():
     Retries connection for Kubernetes (backend may start before PostgreSQL is ready).
     """
     import time
+
     max_retries = 10
     for attempt in range(max_retries):
         try:
@@ -50,7 +51,9 @@ def init_database():
             return
         except Exception as e:
             if attempt < max_retries - 1:
-                print(f"Database not ready (attempt {attempt + 1}/{max_retries}): {e}. Retrying in 3s...")
+                print(
+                    f"Database not ready (attempt {attempt + 1}/{max_retries}): {e}. Retrying in 3s..."
+                )
                 time.sleep(3)
             else:
                 raise
@@ -107,6 +110,7 @@ def _init_schema():
 
 # ----- Write Operations (used by tracker) -----
 
+
 def insert_person(track_id: int, first_seen: datetime, last_seen: datetime):
     """Insert a new person record, or update last_seen if already exists."""
     with get_connection() as conn:
@@ -114,7 +118,7 @@ def insert_person(track_id: int, first_seen: datetime, last_seen: datetime):
         cursor.execute(
             """INSERT INTO persons (track_id, first_seen, last_seen) VALUES (%s, %s, %s)
                ON CONFLICT (track_id) DO UPDATE SET last_seen = EXCLUDED.last_seen""",
-            (track_id, first_seen, last_seen)
+            (track_id, first_seen, last_seen),
         )
         conn.commit()
 
@@ -125,25 +129,31 @@ def update_person_last_seen(track_id: int, last_seen: datetime):
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE persons SET last_seen = %s WHERE track_id = %s",
-            (last_seen, track_id)
+            (last_seen, track_id),
         )
         conn.commit()
 
 
-def insert_observation(track_id: int, timestamp: datetime,
-                       hardhat: bool = None, vest: bool = None, mask: bool = None):
+def insert_observation(
+    track_id: int,
+    timestamp: datetime,
+    hardhat: bool = None,
+    vest: bool = None,
+    mask: bool = None,
+):
     """Insert a new PPE observation record."""
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO person_observations (track_id, timestamp, hardhat, vest, mask)
                VALUES (%s, %s, %s, %s, %s)""",
-            (track_id, timestamp, hardhat, vest, mask)
+            (track_id, timestamp, hardhat, vest, mask),
         )
         conn.commit()
 
 
 # ----- Text-to-SQL Operations (used by chatbot) -----
+
 
 def execute_query(sql: str) -> list:
     """
@@ -155,11 +165,21 @@ def execute_query(sql: str) -> list:
     sql_upper = sql.strip().upper()
 
     # Only allow SELECT queries
-    if not sql_upper.startswith('SELECT'):
+    if not sql_upper.startswith("SELECT"):
         raise ValueError("Only SELECT queries are allowed")
 
     # Block dangerous keywords
-    dangerous_keywords = ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'TRUNCATE', 'CREATE', 'GRANT', 'REVOKE']
+    dangerous_keywords = [
+        "DROP",
+        "DELETE",
+        "UPDATE",
+        "INSERT",
+        "ALTER",
+        "TRUNCATE",
+        "CREATE",
+        "GRANT",
+        "REVOKE",
+    ]
     for keyword in dangerous_keywords:
         if keyword in sql_upper:
             raise ValueError(f"Query contains forbidden keyword: {keyword}")

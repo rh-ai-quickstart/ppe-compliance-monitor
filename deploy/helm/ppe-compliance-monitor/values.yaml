@@ -56,7 +56,7 @@ storage:
 # PostgreSQL database for tracking data persistence
 postgresql:
   enabled: true
-  host: ""  # Defaults to {{ .Release.Name }}-ppe-compliance-monitor-postgresql
+  host: "" # Defaults to {{ .Release.Name }}-ppe-compliance-monitor-postgresql
   port: "5432"
   database: "ppe_tracking"
   user: "ppe_user"
