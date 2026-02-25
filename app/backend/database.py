@@ -6,11 +6,16 @@ Schema:
 - person_observations: Stores per-person PPE status observations over time
 """
 
+import os
+from contextlib import contextmanager
+from datetime import datetime
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import os
-from datetime import datetime
-from contextlib import contextmanager
+
+from logger import get_logger
+
+log = get_logger(__name__)
 
 
 # Database connection settings from environment variables
@@ -51,8 +56,11 @@ def init_database():
             return
         except Exception as e:
             if attempt < max_retries - 1:
-                print(
-                    f"Database not ready (attempt {attempt + 1}/{max_retries}): {e}. Retrying in 3s..."
+                log.warning(
+                    "Database not ready (attempt %s/%s): %s. Retrying in 3s...",
+                    attempt + 1,
+                    max_retries,
+                    e,
                 )
                 time.sleep(3)
             else:
@@ -105,7 +113,8 @@ def _init_schema():
         """)
 
         conn.commit()
-        print(f"PostgreSQL database initialized: {DB_HOST}:{DB_PORT}/{DB_NAME}")
+        log.debug("Schema created or verified (persons, person_observations, indexes)")
+        log.info("PostgreSQL database initialized: %s:%s/%s", DB_HOST, DB_PORT, DB_NAME)
 
 
 # ----- Write Operations (used by tracker) -----
@@ -184,10 +193,14 @@ def execute_query(sql: str) -> list:
         if keyword in sql_upper:
             raise ValueError(f"Query contains forbidden keyword: {keyword}")
 
+    sql_preview = sql.strip()[:120] + "..." if len(sql.strip()) > 120 else sql.strip()
+    log.debug("Executing query: %s", sql_preview)
+
     with get_connection() as conn:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute(sql)
         results = cursor.fetchall()
+        log.debug("Query returned %s row(s)", len(results))
         return [dict(row) for row in results]
 
 
