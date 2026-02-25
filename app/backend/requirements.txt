@@ -6,3 +6,9 @@ transformers
 minio
 ovmsclient
 torch
+# Required by deep-sort-realtime's default MobileNetV2 embedder (used for person
+# tracking). The embedder imports torchvision.models.mobilenet_v2 internally;
+# deep-sort-realtime does not declare it as a dependency, so we add it explicitly.
+torchvision
+psycopg2-binary
+deep-sort-realtime

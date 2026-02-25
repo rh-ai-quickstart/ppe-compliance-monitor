@@ -51,3 +51,15 @@ spec:
               value: {{ .Values.backend.modelVersion | quote }}
             - name: OPENSHIFT
               value: "true"
+            {{- if .Values.postgresql.enabled }}
+            - name: DB_HOST
+              value: {{ .Values.postgresql.host | default (printf "%s-postgresql" (include "ppe-compliance-monitor.fullname" .)) | quote }}
+            - name: DB_PORT
+              value: {{ .Values.postgresql.port | quote }}
+            - name: DB_NAME
+              value: {{ .Values.postgresql.database | quote }}
+            - name: DB_USER
+              value: {{ .Values.postgresql.user | quote }}
+            - name: DB_PASSWORD
+              value: {{ .Values.postgresql.password | quote }}
+            {{- end }}

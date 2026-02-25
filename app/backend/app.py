@@ -101,8 +101,10 @@ def generate_frames():
                 glow = cv2.GaussianBlur(glow, (21, 21), 0)
                 annotated_frame = cv2.addWeighted(annotated_frame, 1, glow, 0.5, 0)
 
-                # Add text with futuristic style
+                # Add text with futuristic style (include track_id for Person)
                 label = f"{currentClass} {conf:.2f}"
+                if currentClass == "Person" and detection.get("track_id") is not None:
+                    label = f"Person #{detection['track_id']} {conf:.2f}"
                 text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)[0]
                 cv2.rectangle(
                     annotated_frame,

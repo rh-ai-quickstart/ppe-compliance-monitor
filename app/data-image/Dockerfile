@@ -20,7 +20,7 @@ RUN cd data && 7z x combined-video-no-gap-rooftop.mp4.7z.001
 COPY models/ppe.pt ./models/
 
 # Stage 2: Export model to OpenVINO format
-FROM ultralytics/ultralytics:latest-cpu AS exporter
+FROM docker.io/ultralytics/ultralytics:latest-cpu AS exporter
 
 COPY --from=extractor /extract/models/ppe.pt /tmp/ppe.pt
 
