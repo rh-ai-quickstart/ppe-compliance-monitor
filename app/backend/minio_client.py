@@ -5,6 +5,8 @@ import time
 from minio import Minio
 from minio.error import S3Error
 
+from urllib.parse import urlparse
+
 
 def get_minio_client():
     """Create and return a MinIO client from environment variables."""
@@ -12,6 +14,12 @@ def get_minio_client():
     access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
     secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
     secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
+    # Minio() expects bare host:port; strip scheme if a full URL was provided
+    parsed = urlparse(endpoint)
+    if parsed.scheme in ("http", "https"):
+        endpoint = parsed.netloc or parsed.path
+        if parsed.scheme == "https":
+            secure = True
 
     return Minio(
         endpoint,
@@ -64,18 +72,3 @@ def download_file(
             else:
                 print(f"Download failed after {max_retries} attempts: {e}")
                 raise
-
-
-def is_minio_enabled() -> bool:
-    """
-    Check if MinIO is enabled via environment variable.
-
-    When MINIO_ENABLED=true:
-    - Downloads files from MinIO to temp directory at runtime
-    - Used for local development with podman-compose
-
-    When MINIO_ENABLED=false (default):
-    - Uses MODEL_PATH and VIDEO_PATH environment variables
-    - Used for Kubernetes/OpenShift where init container pre-downloads files to PVC
-    """
-    return os.getenv("MINIO_ENABLED", "false").lower() == "true"

@@ -8,7 +8,7 @@ from chatbot import generate_response
 import traceback
 import os
 import tempfile
-from minio_client import download_file, is_minio_enabled
+from minio_client import download_file
 
 
 app = Flask(__name__)
@@ -34,16 +34,13 @@ def get_video_path():
     When MINIO_ENABLED=false: Uses VIDEO_PATH environment variable.
         - Used for Kubernetes/OpenShift where files are pre-downloaded to PVC
     """
-    if is_minio_enabled():
-        bucket = os.getenv("MINIO_VIDEO_BUCKET", "data")
-        object_name = os.getenv("MINIO_VIDEO_KEY", "combined-video-no-gap-rooftop.mp4")
-        local_path = os.path.join(
-            tempfile.gettempdir(), "minio_cache", "video", object_name
-        )
-        print(f"Downloading video from MinIO to {local_path}")
-        return download_file(bucket, object_name, local_path)
-    else:
-        raise ValueError("MinIO is not enabled")
+    bucket = os.getenv("MINIO_VIDEO_BUCKET", "data")
+    object_name = os.getenv("MINIO_VIDEO_KEY", "combined-video-no-gap-rooftop.mp4")
+    local_path = os.path.join(
+        tempfile.gettempdir(), "minio_cache", "video", object_name
+    )
+    print(f"Downloading video from MinIO to {local_path}")
+    return download_file(bucket, object_name, local_path)
 
 
 video_path = get_video_path()
