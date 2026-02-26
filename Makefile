@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help local-up local-build-up local-down build push deploy undeploy dev-backend dev-frontend local-build build-push-data kill-ports
+.PHONY: help local-up local-build-up local-down build push deploy undeploy dev-backend dev-frontend local-build build-push-data kill-ports check-openai-env
 help:
 	@echo "Available targets:"
 	@echo "  local-up   - Start local stack with Podman Compose"
@@ -14,6 +14,12 @@ help:
 	@echo "  dev-frontend - Install deps and run frontend"
 	@echo "  kill-ports   - Kill processes using required ports (3000, 8888, 8080, 8081, 9000, 9001)"
 
+
+# Load .env file if it exists
+ifneq (,$(wildcard .env))
+  include .env
+  export OPENAI_API_TOKEN OPENAI_API_ENDPOINT OPENAI_MODEL OPENAI_TEMPERATURE
+endif
 
 COMPOSE_FILE ?= $(CURDIR)/deploy/local/podman-compose.yaml
 NAMESPACE ?= ppe-compliance-monitor-demo
@@ -37,10 +43,28 @@ FRONTEND_DIR ?= app/frontend
 HELM_RELEASE ?= ppe-compliance-monitor
 HELM_CHART ?= deploy/helm/ppe-compliance-monitor
 
-local-up: local-build kill-ports
+check-openai-env:
+	@token="$(OPENAI_API_TOKEN)"; \
+	endpoint="$(OPENAI_API_ENDPOINT)"; \
+	model="$(OPENAI_MODEL)"; \
+	temp="$(OPENAI_TEMPERATURE)"; \
+	if [ -z "$$token" ] || [ -z "$$endpoint" ] || [ -z "$$model" ]; then \
+		echo "==> Missing required OpenAI environment variables."; \
+		if [ -z "$$token" ]; then printf "  OPENAI_API_TOKEN: "; read token; fi; \
+		if [ -z "$$endpoint" ]; then printf "  OPENAI_API_ENDPOINT: "; read endpoint; fi; \
+		if [ -z "$$model" ]; then printf "  OPENAI_MODEL: "; read model; fi; \
+		if [ -z "$$temp" ]; then temp="0.7"; fi; \
+		printf 'OPENAI_API_TOKEN=%s\nOPENAI_API_ENDPOINT=%s\nOPENAI_MODEL=%s\nOPENAI_TEMPERATURE=%s\n' \
+			"$$token" "$$endpoint" "$$model" "$$temp" > .env; \
+		echo "==> Saved to .env"; \
+	else \
+		echo "==> OpenAI environment variables loaded from .env"; \
+	fi
+
+local-up: check-openai-env local-build kill-ports
 	PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) up
 
-local-build-up: kill-ports
+local-build-up: check-openai-env kill-ports
 	PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) up --build
 
 local-build:
@@ -74,7 +98,7 @@ build-push-data:
 	podman build --platform $(PLATFORM_RELEASE) -t $(DATA_IMAGE) -f app/data-image/Dockerfile app
 	podman push $(DATA_IMAGE)
 
-deploy:
+deploy: check-openai-env
 	@domain=$$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}' 2>/dev/null || true); \
 	if [ -n "$(NAMESPACE)" ]; then oc new-project "$(NAMESPACE)" --display-name="$(NAMESPACE)" >/dev/null 2>&1 || oc project "$(NAMESPACE)"; fi; \
 	if [ -n "$$domain" ]; then \

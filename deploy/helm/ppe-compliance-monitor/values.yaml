@@ -3,14 +3,20 @@ backend:
   port: 8888
   corsOrigins: ""
   image:
-    repository: quay.io/rh-ai-quickstart/ppe-compliance-monitor-backend
-    tag: latest
+    repository: quay.io/ikatav/ppe
+    tag: itay
     pullPolicy: Always
   serviceUrl: "http://ppe-predictor.svc.cluster.local:8888"
   modelInputName: "x"
   modelName: "ppe"
   modelVersion: "1"
   logLevel: "INFO"
+
+openai:
+  apiToken: ""
+  apiEndpoint: ""
+  model: ""
+  temperature: "0.7"
 
 frontend:
   replicas: 1

@@ -104,6 +104,10 @@ services:
       DB_USER: ppe_user
       DB_PASSWORD: ppe_password
       LOG_LEVEL: "INFO"
+      OPENAI_API_TOKEN: "${OPENAI_API_TOKEN}"
+      OPENAI_API_ENDPOINT: "${OPENAI_API_ENDPOINT}"
+      OPENAI_MODEL: "${OPENAI_MODEL}"
+      OPENAI_TEMPERATURE: "${OPENAI_TEMPERATURE:-0.7}"
     ports:
       - "8888:8888"
     networks:

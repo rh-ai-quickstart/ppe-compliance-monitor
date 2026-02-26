@@ -3,9 +3,7 @@ from flask_cors import CORS
 import cv2
 import numpy as np
 from multimodel import MultiModalAIDemo
-from transformers import pipeline
-from chatbot import generate_response
-import traceback
+from llm import LLMChat
 import os
 import tempfile
 from minio_client import download_file
@@ -51,14 +49,10 @@ demo = MultiModalAIDemo(video_path)
 demo.setup_components()
 log.info("MultiModalAIDemo initialized and components ready")
 
+llm_chat = LLMChat()
+
 latest_description = "Initializing..."
 latest_summary = "Processing video..."
-
-log.info("Loading QA pipeline (distilbert-base-uncased-distilled-squad)")
-qa_pipeline = pipeline(
-    "question-answering", model="distilbert-base-uncased-distilled-squad"
-)
-log.info("QA pipeline loaded")
 
 
 def generate_frames():
@@ -157,48 +151,29 @@ def latest_info():
     return jsonify({"description": latest_description, "summary": latest_summary})
 
 
-@api.route("/ask_question", methods=["POST"])
-def ask_question():
-    """Answer a question based on latest description and summary."""
+@api.route("/chat", methods=["POST"])
+def chat():
+    """Answer a question based on latest description and summary.
+
+    Supports streaming via Server-Sent Events when ``stream=true`` is sent in
+    the JSON body.  An optional ``session_id`` field enables per-session
+    conversation memory (defaults to ``"default"``).
+    """
+    global latest_description, latest_summary
     data = request.get_json(silent=True) or {}
     question = (data.get("question") or "").strip()
     if not question:
         return jsonify({"error": "Field 'question' is required."}), 400
 
+    session_id = (data.get("session_id") or "default").strip()
     context = latest_description + " " + latest_summary
-    result = qa_pipeline(question=question, context=context)
-    answer = result["answer"]
+
+    answer = llm_chat.ask_question(
+        question=question,
+        context=context,
+        session_id=session_id,
+    )
     return jsonify({"answer": answer})
-
-
-@api.route("/chat", methods=["POST"])
-def chat():
-    """Handle chat requests using latest detections and summary."""
-    try:
-        global latest_description, latest_summary
-        data = request.get_json(silent=True) or {}
-        user_message = (data.get("question") or "").strip()
-        if not user_message:
-            return jsonify({"error": "Field 'question' is required."}), 400
-
-        demo.capture_and_update()
-        if demo.description_buffer:
-            latest_description = demo.description_buffer[-1]
-        latest_summary = demo.latest_summary or latest_summary
-        latest_detection = demo.get_latest_detection()
-        current_summary = demo.get_latest_summary() or latest_summary
-
-        response = generate_response(user_message, latest_detection, current_summary)
-        return jsonify({"answer": response})
-    except Exception as e:
-        log.error(
-            f"Error in chat route ({type(e).__name__}): {e}\n{traceback.format_exc()}"
-        )
-        return jsonify(
-            {
-                "answer": f"I'm sorry, but I encountered an error while processing your request: {str(e)}"
-            }
-        )
 
 
 app.register_blueprint(api)
