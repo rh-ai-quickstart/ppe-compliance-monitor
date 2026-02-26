@@ -109,6 +109,10 @@ openshift:
   route:
     enabled: true
     host: ""
+    tls:
+      enabled: false
+      termination: edge
+      insecureEdgeTerminationPolicy: Allow
   backendRoute:
     enabled: true
     host: ""
