@@ -26,6 +26,25 @@ spec:
           ports:
             - containerPort: {{ .Values.frontend.port }}
               name: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
           volumeMounts:
             - name: frontend-env
               mountPath: /app/build/env.js

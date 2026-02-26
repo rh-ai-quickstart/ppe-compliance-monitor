@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
 import './ChatBot.css';
 import { API_URL } from '../config';
 
@@ -39,7 +40,13 @@ const ChatBot = () => {
       <div className="chat-history" ref={chatHistoryRef}>
         {chatHistory.map((chat, index) => (
           <div key={index} className={`chat-message ${chat.sender}`}>
-            <p>{chat.message}</p>
+            {chat.sender === 'bot' ? (
+              <div className="bot-markdown">
+                <ReactMarkdown>{chat.message}</ReactMarkdown>
+              </div>
+            ) : (
+              <p>{chat.message}</p>
+            )}
           </div>
         ))}
       </div>

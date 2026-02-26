@@ -51,6 +51,14 @@ spec:
               value: {{ .Values.backend.modelVersion | quote }}
             - name: OPENSHIFT
               value: "true"
+            - name: OPENAI_API_TOKEN
+              value: {{ .Values.openai.apiToken | quote }}
+            - name: OPENAI_API_ENDPOINT
+              value: {{ .Values.openai.apiEndpoint | quote }}
+            - name: OPENAI_MODEL
+              value: {{ .Values.openai.model | quote }}
+            - name: OPENAI_TEMPERATURE
+              value: {{ .Values.openai.temperature | quote }}
             {{- if .Values.postgresql.enabled }}
             - name: DB_HOST
               value: {{ .Values.postgresql.host | default (printf "%s-postgresql" (include "ppe-compliance-monitor.fullname" .)) | quote }}
@@ -62,4 +70,6 @@ spec:
               value: {{ .Values.postgresql.user | quote }}
             - name: DB_PASSWORD
               value: {{ .Values.postgresql.password | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.backend.logLevel | quote }}
             {{- end }}

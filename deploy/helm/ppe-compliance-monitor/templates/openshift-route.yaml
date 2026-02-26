@@ -17,4 +17,9 @@ spec:
     name: {{ include "ppe-compliance-monitor.fullname" . }}-frontend
   port:
     targetPort: http
+  {{- if .Values.openshift.route.tls.enabled }}
+  tls:
+    termination: {{ .Values.openshift.route.tls.termination }}
+    insecureEdgeTerminationPolicy: {{ .Values.openshift.route.tls.insecureEdgeTerminationPolicy }}
+  {{- end }}
 {{- end }}
