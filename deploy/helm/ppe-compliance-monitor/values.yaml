@@ -10,6 +10,7 @@ backend:
   modelInputName: "x"
   modelName: "ppe"
   modelVersion: "1"
+  logLevel: "INFO"
 
 frontend:
   replicas: 1

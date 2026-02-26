@@ -62,4 +62,6 @@ spec:
               value: {{ .Values.postgresql.user | quote }}
             - name: DB_PASSWORD
               value: {{ .Values.postgresql.password | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.backend.logLevel | quote }}
             {{- end }}

@@ -103,6 +103,7 @@ services:
       DB_NAME: ppe_tracking
       DB_USER: ppe_user
       DB_PASSWORD: ppe_password
+      LOG_LEVEL: "INFO"
     ports:
       - "8888:8888"
     networks:
