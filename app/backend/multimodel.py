@@ -330,9 +330,6 @@ class MultiModalAIDemo:
                 if do_last_seen_db_update:
                     update_person_last_seen(track_id, now)
 
-        if do_last_seen_db_update:
-            self._frames_since_last_seen_update = 0
-
             # Associate PPE with this person
             ppe_status = self._associate_ppe_to_person(person_bbox, detections)
             tracked_person = {
@@ -375,6 +372,9 @@ class MultiModalAIDemo:
 
             if len(self.person_observations) > 1000:
                 self.person_observations = self.person_observations[-1000:]
+
+        if do_last_seen_db_update:
+            self._frames_since_last_seen_update = 0
 
         self.latest_tracked_persons = tracked_persons
         # --- End Object Tracking ---
