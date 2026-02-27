@@ -5,8 +5,6 @@ import numpy as np
 from multimodel import MultiModalAIDemo
 from llm import LLMChat
 import os
-import tempfile
-from minio_client import download_file
 from logger import get_logger
 
 log = get_logger(__name__)
@@ -26,26 +24,24 @@ else:
 CORS(app, resources={r"/*": {"origins": cors_allowed_origins}})
 
 
-def get_video_path():
+def get_video_source():
     """
-    Get video path, downloading from MinIO if enabled.
+    Get video stream URL. Always streams (no file mode).
 
-    When MINIO_ENABLED=true: Downloads video from MinIO to a temp directory.
-        - Used for local development with podman-compose
-    When MINIO_ENABLED=false: Uses VIDEO_PATH environment variable.
-        - Used for Kubernetes/OpenShift where files are pre-downloaded to PVC
+    VIDEO_STREAM_URL: RTSP/HTTP stream URL (live camera or MP4 simulation via MediaMTX).
     """
-    bucket = os.getenv("MINIO_VIDEO_BUCKET", "data")
-    object_name = os.getenv("MINIO_VIDEO_KEY", "combined-video-no-gap-rooftop.mp4")
-    local_path = os.path.join(
-        tempfile.gettempdir(), "minio_cache", "video", object_name
-    )
-    log.info(f"Downloading video from MinIO to {local_path}")
-    return download_file(bucket, object_name, local_path)
+    stream_url = os.getenv("VIDEO_STREAM_URL", "").strip()
+    if not stream_url:
+        raise SystemExit(
+            "VIDEO_STREAM_URL is required. Set it to an RTSP/HTTP stream URL "
+            "(e.g. rtsp://video-stream:8554/live for local, or rtsp://camera-ip:554/stream for real camera)."
+        )
+    log.info(f"Using video stream: {stream_url}")
+    return stream_url
 
 
-video_path = get_video_path()
-demo = MultiModalAIDemo(video_path)
+video_source = get_video_source()
+demo = MultiModalAIDemo(video_source)
 demo.setup_components()
 log.info("MultiModalAIDemo initialized and components ready")
 

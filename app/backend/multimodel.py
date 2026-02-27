@@ -1,4 +1,5 @@
 import cv2
+import time
 from collections import defaultdict
 from datetime import datetime
 
@@ -17,9 +18,12 @@ log = get_logger(__name__)
 class MultiModalAIDemo:
     """Core video analysis pipeline for detection, summaries, and chat context."""
 
-    def __init__(self, video_path):
-        """Initialize the demo with a local video path."""
-        self.video_path = video_path
+    def __init__(self, video_source):
+        """Initialize the demo with a video source (file path or RTSP/HTTP URL)."""
+        self.video_source = video_source
+        self.is_live_stream = video_source.startswith(
+            ("rtsp://", "http://", "https://")
+        )
         self.cap = None
         self.runtime = None
         self.summarizer = None
@@ -58,7 +62,20 @@ class MultiModalAIDemo:
 
     def setup_components(self):
         """Load models and initialize runtime components."""
-        self.cap = cv2.VideoCapture(self.video_path)
+        self.cap = cv2.VideoCapture(self.video_source)
+        if self.is_live_stream and not self.cap.isOpened():
+            log.info("Stream not ready at startup, retrying...")
+            for attempt in range(5):
+                time.sleep(2)
+                self.cap.release()
+                self.cap = cv2.VideoCapture(self.video_source)
+                if self.cap.isOpened():
+                    log.info(f"Stream connected (attempt {attempt + 1})")
+                    break
+        if self.is_live_stream:
+            log.info("Video is live streaming")
+        else:
+            log.info("Video is playing from MP4")
         self.runtime = Runtime()
         log.info(f"Model classes: {self.runtime.CLASSES}")
         self.class_names = list(self.runtime.CLASSES.values())
@@ -235,10 +252,35 @@ class MultiModalAIDemo:
                         status[ppe_type] = ppe_value
         return status
 
+    def _reconnect_stream(self):
+        """Reconnect to live stream with retry and backoff."""
+        max_retries = 5
+        base_delay = 2
+        for attempt in range(max_retries):
+            try:
+                if self.cap is not None:
+                    self.cap.release()
+                self.cap = cv2.VideoCapture(self.video_source)
+                if self.cap.isOpened():
+                    log.info(f"Reconnected to stream (attempt {attempt + 1})")
+                    return True
+            except Exception as e:
+                log.warning(f"Reconnect attempt {attempt + 1} failed: {e}")
+            delay = base_delay * (2**attempt)
+            log.debug(f"Waiting {delay}s before retry")
+            time.sleep(delay)
+        log.error("Failed to reconnect to stream after all retries")
+        return False
+
     def capture_and_update(self, resize_to=None):
         """Capture a frame, optionally resize, update detection state, and return frame data."""
         success, frame = self.cap.read()
         if not success:
+            if self.is_live_stream:
+                log.debug("Stream read failed, attempting reconnect")
+                if self._reconnect_stream():
+                    return self.capture_and_update(resize_to=resize_to)
+                return None, []
             log.debug("End of video reached, looping back to start")
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             return None, []

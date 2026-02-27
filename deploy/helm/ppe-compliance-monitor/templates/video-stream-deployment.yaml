@@ -1,0 +1,71 @@
+{{- if not .Values.videoStream.streamUrl }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ppe-compliance-monitor.fullname" . }}-video-stream
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: video-stream
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "ppe-compliance-monitor.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: video-stream
+  template:
+    metadata:
+      labels:
+        {{- include "ppe-compliance-monitor.labels" . | nindent 8 }}
+        app.kubernetes.io/component: video-stream
+    spec:
+      initContainers:
+        - name: download-video
+          image: "{{ .Values.videoStream.ffmpegImage.repository }}:{{ .Values.videoStream.ffmpegImage.tag }}"
+          imagePullPolicy: {{ .Values.videoStream.ffmpegImage.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              export MC_CONFIG_DIR=/tmp/.mc
+              until mc alias set myminio "http://{{ .Values.minio.secret.host }}:{{ .Values.minio.secret.port }}" "{{ .Values.minio.secret.user }}" "{{ .Values.minio.secret.password }}" 2>/dev/null; do
+                echo "MinIO not ready, retrying..."
+                sleep 2
+              done
+              mc cp myminio/{{ .Values.storage.video.bucket }}/{{ .Values.storage.video.key }} /data/video.mp4
+              echo "Video downloaded"
+          env:
+            - name: MINIO_ENDPOINT
+              value: "http://{{ .Values.minio.secret.host }}:{{ .Values.minio.secret.port }}"
+            - name: MINIO_ACCESS_KEY
+              value: {{ .Values.minio.secret.user | quote }}
+            - name: MINIO_SECRET_KEY
+              value: {{ .Values.minio.secret.password | quote }}
+          volumeMounts:
+            - name: video-data
+              mountPath: /data
+      containers:
+        - name: mediamtx
+          image: "{{ .Values.videoStream.image.repository }}:{{ .Values.videoStream.image.tag }}"
+          imagePullPolicy: {{ .Values.videoStream.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.videoStream.port }}
+              name: rtsp
+        - name: ffmpeg
+          image: docker.io/linuxserver/ffmpeg:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for MediaMTX to start..."
+              sleep 5
+              echo "Starting FFmpeg stream"
+              exec ffmpeg -re -stream_loop -1 -i /data/video.mp4 -c copy -f rtsp rtsp://localhost:{{ .Values.videoStream.port }}/{{ .Values.videoStream.path }}
+          volumeMounts:
+            - name: video-data
+              mountPath: /data
+      volumes:
+        - name: video-data
+          emptyDir: {}
+{{- end }}
