@@ -8,7 +8,8 @@ help:
 	@echo "  build      - Build container image"
 	@echo "  push       - Push container image"
 	@echo "  build-push-data - Build and push data container image (video + models)"
-	@echo "  deploy     - Deploy manifests to OpenShift"
+	@echo "  deploy     - Deploy manifests to OpenShift (in-cluster MP4 stream by default)"
+	@echo "             Use VIDEO_STREAM_URL=rtsp://... for real camera"
 	@echo "  undeploy   - Remove manifests from OpenShift"
 	@echo "  dev-backend - Create venv, install deps, run backend"
 	@echo "  dev-frontend - Install deps and run frontend"
@@ -23,6 +24,11 @@ endif
 
 COMPOSE_FILE ?= $(CURDIR)/deploy/local/podman-compose.yaml
 NAMESPACE ?= ppe-compliance-monitor-demo
+# Video stream URL - for local-up, dev-backend, and deploy
+# Local default: rtsp://video-stream:8554/live (MediaMTX in compose)
+# make deploy (no args): in-cluster MP4 simulation (video-stream stack)
+# make deploy VIDEO_STREAM_URL=rtsp://user:pass@camera-ip:554/stream: real camera
+VIDEO_STREAM_URL ?= rtsp://video-stream:8554/live
 PLATFORM_RELEASE ?= linux/amd64
 PLATFORM_LOCAL ?= $(shell uname -m | sed -e 's/x86_64/linux\/amd64/' -e 's/arm64/linux\/arm64/' -e 's/aarch64/linux\/arm64/')
 
@@ -61,11 +67,11 @@ check-openai-env:
 		echo "==> OpenAI environment variables loaded from .env"; \
 	fi
 
-local-up: check-openai-env local-build kill-ports
-	PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) up
+local-up: local-build kill-ports
+	VIDEO_STREAM_URL="$(VIDEO_STREAM_URL)" PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) up
 
-local-build-up: check-openai-env kill-ports
-	PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) up --build
+local-build-up: kill-ports
+	VIDEO_STREAM_URL="$(VIDEO_STREAM_URL)" PODMAN_DEFAULT_PLATFORM=$(PLATFORM_LOCAL) podman-compose -f $(COMPOSE_FILE) up --build
 
 local-build:
 	@should_build=0; \
@@ -106,24 +112,27 @@ deploy: check-openai-env
 	else \
 		host=""; \
 	fi; \
-	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) \
-		--namespace $(NAMESPACE) --create-namespace \
-		--set backend.image.repository=$(IMAGE_REPOSITORY)-backend \
+	helm_args="--set backend.image.repository=$(IMAGE_REPOSITORY)-backend \
 		--set backend.image.tag=$(IMAGE_TAG) \
 		--set frontend.image.repository=$(IMAGE_REPOSITORY)-frontend \
 		--set frontend.image.tag=$(IMAGE_TAG) \
 		--set data.image.repository=$(IMAGE_REPOSITORY)-data \
 		--set data.image.tag=$(IMAGE_TAG) \
-		$${host:+--set openshift.sharedHost=$$host}
+		$${host:+--set openshift.sharedHost=$$host}"; \
+	if [ -n "$(VIDEO_STREAM_URL)" ] && [ "$(VIDEO_STREAM_URL)" != "rtsp://video-stream:8554/live" ]; then \
+		helm_args="$$helm_args --set videoStream.streamUrl=$(VIDEO_STREAM_URL)"; \
+	fi; \
+	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) \
+		--namespace $(NAMESPACE) --create-namespace $$helm_args
 
 undeploy:
 	@if [ -n "$(NAMESPACE)" ]; then oc project "$(NAMESPACE)"; fi
-	helm uninstall $(HELM_RELEASE) --namespace $(NAMESPACE)
+	@helm uninstall $(HELM_RELEASE) --namespace $(NAMESPACE) 2>/dev/null || echo "Release $(HELM_RELEASE) not found (already uninstalled or never deployed)."
 
 dev-backend:
 	$(PYTHON) -m venv $(VENV_DIR)
 	. $(VENV_DIR)/bin/activate && pip install -r $(BACKEND_DIR)/requirements.txt
-	. $(VENV_DIR)/bin/activate && $(PYTHON) $(BACKEND_DIR)/app.py
+	. $(VENV_DIR)/bin/activate && VIDEO_STREAM_URL="$(VIDEO_STREAM_URL)" $(PYTHON) $(BACKEND_DIR)/app.py
 
 dev-frontend:
 	cd $(FRONTEND_DIR) && npm install

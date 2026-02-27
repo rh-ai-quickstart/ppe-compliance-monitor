@@ -39,8 +39,13 @@ spec:
               value: "false"
             - name: MODEL_PATH
               value: "/data/models/{{ .Values.storage.model.key }}"
-            - name: VIDEO_PATH
-              value: "/data/video/{{ .Values.storage.video.key }}"
+            {{- if .Values.videoStream.streamUrl }}
+            - name: VIDEO_STREAM_URL
+              value: {{ .Values.videoStream.streamUrl | quote }}
+            {{- else }}
+            - name: VIDEO_STREAM_URL
+              value: "rtsp://{{ include "ppe-compliance-monitor.fullname" . }}-video-stream.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.videoStream.port }}/{{ .Values.videoStream.path }}"
+            {{- end }}
             - name: SERVICE_URL
               value: "http://ppe-predictor.{{ .Release.Namespace }}.svc.cluster.local:8888"
             - name: MODEL_INPUT_NAME

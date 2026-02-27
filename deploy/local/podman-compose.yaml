@@ -48,6 +48,40 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # RTSP server for video streaming (MP4 simulation or real camera proxy)
+  video-stream:
+    image: docker.io/bluenviron/mediamtx:latest
+    container_name: video-stream
+    ports:
+      - "8554:8554"
+    networks:
+      - ppe
+
+  # FFmpeg publisher: downloads MP4 from MinIO and streams to MediaMTX
+  video-stream-ffmpeg:
+    build:
+      context: ../../app
+      dockerfile: video-stream-image/Dockerfile
+    image: ppe-compliance-monitor-video-stream:local
+    depends_on:
+      data-loader:
+        condition: service_completed_successfully
+      video-stream:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_VIDEO_BUCKET: data
+      MINIO_VIDEO_KEY: combined-video-no-gap-rooftop.mp4
+      MEDIAMTX_HOST: video-stream
+      MEDIAMTX_PORT: "8554"
+    networks:
+      - ppe
+    restart: unless-stopped
+
   # Init service: uploads model and video files to MinIO (idempotent)
   data-loader:
     build:
@@ -73,13 +107,17 @@ services:
     depends_on:
       data-loader:
         condition: service_completed_successfully
+      video-stream:
+        condition: service_started
       minio:
         condition: service_healthy
       postgresql:
         condition: service_healthy
     environment:
       CORS_ORIGINS: "http://localhost:3000,http://0.0.0.0:3000,http://127.0.0.1:3000"
-      # MinIO configuration
+      # Video stream (RTSP) - set via Makefile VIDEO_STREAM_URL or env
+      VIDEO_STREAM_URL: ${VIDEO_STREAM_URL:-rtsp://video-stream:8554/live}
+      # MinIO configuration (for model; video comes from stream when VIDEO_STREAM_URL set)
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin

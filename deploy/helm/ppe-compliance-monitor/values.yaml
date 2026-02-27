@@ -3,8 +3,8 @@ backend:
   port: 8888
   corsOrigins: ""
   image:
-    repository: quay.io/ikatav/ppe
-    tag: itay
+    repository: quay.io/rh-ai-quickstart/ppe-compliance-monitor-backend
+    tag: latest
     pullPolicy: Always
   serviceUrl: "http://ppe-predictor.svc.cluster.local:8888"
   modelInputName: "x"
@@ -47,6 +47,23 @@ minio:
     # bucket: models
     # urls:
     # - https://raw.githubusercontent.com/***
+
+# Video stream (RTSP) - always streams. Default: in-cluster MP4 from MinIO via MediaMTX
+# For real camera: set streamUrl (e.g. rtsp://user:pass@camera-ip:554/stream)
+videoStream:
+  # When empty: deploy in-cluster video-stream stack (MP4 from MinIO)
+  # When set: use external stream (real camera), do not deploy video-stream
+  streamUrl: ""
+  image:
+    repository: bluenviron/mediamtx
+    tag: latest
+    pullPolicy: IfNotPresent
+  ffmpegImage:
+    repository: minio/mc
+    tag: latest
+    pullPolicy: IfNotPresent
+  port: 8554
+  path: live
 
 # MinIO storage configuration for model and video files
 storage:

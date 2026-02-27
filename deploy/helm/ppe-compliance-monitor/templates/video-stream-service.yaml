@@ -1,0 +1,20 @@
+{{- if not .Values.videoStream.streamUrl }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ppe-compliance-monitor.fullname" . }}-video-stream
+  labels:
+    {{- include "ppe-compliance-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: video-stream
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ include "ppe-compliance-monitor.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: video-stream
+  ports:
+    - port: {{ .Values.videoStream.port }}
+      targetPort: rtsp
+      protocol: TCP
+      name: rtsp
+{{- end }}
